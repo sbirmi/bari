@@ -1,5 +1,5 @@
-bari (बारी )
-===========
+bari (बारी)
+==========
 
 A web-based, multiplayer turn based game framework and a collection of games.
 
