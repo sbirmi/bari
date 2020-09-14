@@ -3,6 +3,14 @@ bari (बारी )
 
 A web-based, multiplayer turn based game framework and a collection of games.
 
+Requirements
+============
+
+1. websockets
+   $ pip install websockets
+2. Flask
+   $ pip install Flask
+
 Architecture
 ============
 
@@ -39,32 +47,40 @@ hosting a new game, automatically redirect to that game.
 >    | | | | | ... (clients)                   |
 >    | | | | | Client network interface        |
 >  [ Main loop ]                               |
+>    | | | |   ... asyncio.Queue (rx, tx)      |
 >    | | | |                                   |
->    | | | |                                   |
->    | | | +-[ GameName1:instance1 ]           |
->    | | +---[ GameName1:instance2 ]           |
+>    | | | +-[ path1 > GameName1:instance1 ]   |
+>    | | +---[ path2 > GameName1:instance2 ]   |
 >    | |     ...                               |
->    | +-----[ GameName2:instance1 ]           |
->    +-------[ GameName2:instance2 ]           |
+>    | +-----[ path3 > GameName2:instance1 ]   |
+>    +-------[ path4 > GameName2:instance2 ]   |
 >            ...                               |
 >                                              |
 > ---------------------------------------------
 >
 
-How does chat work?
-What is the scope of chat messages?
+How does a game register the information needed to host a game?
+How does chat work? What is the scope of chat messages?
+
+How does the sender know the handles of everyone in the game?
+How do folks joining a game send a broadcast to the lobby about users joining?
+Broadcast messages to just the game?
+
+How does the Lobby on hosting a game register queues with the main loop?
 
 Client network layer
 
 Message Protocol
 ================
 
+[ "DISCONNECT" ]
+
 Lobby
 -----
 
-1. [ "LIST" ] : Client -> Server
+1. [ <str:"gamename">, "HOST" ] : Client -> Server
 
-2. [ "GAME", <str:gamename>, <int:gid>, [ .. game specific details .. ] ] : Server -> Client
+2. [ <str:"gamename:<gid>">, "GAME", [ .. game specific details .. ] ] : Server -> Client
    This is sent as a response to the "LIST" command or
 
 
