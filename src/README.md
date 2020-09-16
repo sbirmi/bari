@@ -60,6 +60,30 @@ hosting a new game, automatically redirect to that game.
                                                  |
     ---------------------------------------------
 
+
+    
+       Client1      Client2
+        ^            ^
+        |            |
+      ClientTx     ClientTx
+      Queue[ws]    Queue[ws]
+        |            |
+      [       MainLoop              ]
+         ^         |             |
+         |         |             |
+         |         v             v
+      common      RxQueue       RxQueue
+      TxQueue     for           for
+      for all     game          game
+      game        instance.     instance.
+      instances.  Element =     Element =
+      Element =    (ws, jmsg)    (ws, jmsg)
+       (wsOrPath,  |             |
+        jmsg)      |             +---> [ game instance 2 ]
+                   |
+                   +---> [ game instance 1 ]
+
+
 1. How does a game register the information needed to host a game?
 2. How does chat work? What is the scope of chat messages?
 3. How does the sender know the handles of everyone in the game?
@@ -67,12 +91,9 @@ hosting a new game, automatically redirect to that game.
 5. Broadcast messages to just the game?
 6. How does the Lobby on hosting a game register queues with the main loop?
 
-Client network layer
 
 Message Protocol
 ================
-
-[ "DISCONNECT" ]
 
 Lobby
 -----
@@ -87,7 +108,4 @@ Game
 ----
 
 State machine for the game with handlers for various events.
-
-Game API:
-   
 

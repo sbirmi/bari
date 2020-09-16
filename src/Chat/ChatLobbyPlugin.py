@@ -1,36 +1,30 @@
 from fwk.GamePlugin import Plugin
+from fwk.Msg import InternalRegisterGiMsg
 from Chat.ChatRoom import ChatRoom
 
 class ChatLobbyPlugin(Plugin):
     gameIdx = 0
     rooms = {}
 
-    async def worker(self):
-        print(self.path, "waiting for messages")
-        while True:
-            rxWs, jmsg = await self.rxQueue.get()
-            self.rxQueue.task_done()
-            print("Received:", jmsg)
+    def processHost(self, qmsg):
+        self.gameIdx += 1
+        newRoom = ChatRoom(
+                "chat:{}".format(self.gameIdx),
+                "Chat Room #{}".format(self.gameIdx))
+        self.rooms[self.gameIdx] = newRoom
 
-            if jmsg == [self.path, "CONNECT"]:
-                # Ignore
-                continue
+        self.txQueue.put_nowait(InternalRegisterGiMsg(newRoom))
+        return True
 
-            if jmsg == [self.path, "DISCONNECT"]:
-                # Ignore
-                continue
+    def processMsg(self, qmsg):
+        if super(ChatLobbyPlugin, self).processMsg(qmsg):
+            return True
 
-            if jmsg != [ self.path, "HOST" ]:
-                self.txQueue.put_nowait((rxWs, "bad-command"))
-                continue
+        if qmsg.jmsg == [self.path, "HOST"]:
+            return self.processHost(qmsg)
 
-            self.gameIdx += 1
-            newRoom = ChatRoom(
-                    "chat:{}".format(self.gameIdx),
-                    "Chat Room #{}".format(self.gameIdx))
-            self.rooms[self.gameIdx] = newRoom
+        return False
 
-            self.txQueue.put_nowait(("HOST", newRoom))
 
 def plugin():
     return ChatLobbyPlugin("chat", "The Chat Game")
