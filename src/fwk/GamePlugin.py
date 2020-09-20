@@ -1,7 +1,8 @@
 from fwk.Msg import (
         InternalConnectWsToGi,
         InternalDisconnectWsToGi,
-        MsgToWs,
+        ClientRxMsg,
+        ClientTxMsg,
 )
 
 
@@ -26,6 +27,12 @@ class Plugin:
         self.txQueue = None
         self.ws = set()
 
+    # ---------------------------------
+    # Startup related
+
+    def queueSetupComplete(self):
+        pass
+
     def setRxTxQueues(self, rxQueue, txQueue):
         assert not self.rxQueue
         assert not self.txQueue
@@ -33,6 +40,20 @@ class Plugin:
         assert txQueue
         self.rxQueue = rxQueue
         self.txQueue = txQueue
+        self.queueSetupComplete()
+
+
+    # ---------------------------------
+    # Message sending helpers
+
+    def broadcast(self, jmsg, initiatorWs=None):
+        for toWs in self.ws:
+            self.txQueue.put_nowait(
+                    ClientTxMsg(jmsg, toWs,
+                        initiatorWs=initiatorWs))
+
+    # ---------------------------------
+    # Message handling
 
     def processConnect(self, ws):
         """Add client websocket as a member in this game instance"""
@@ -68,4 +89,8 @@ class Plugin:
 
             processed = self.processMsg(qmsg)
             if not processed:
-                self.txQueue.put_nowait(MsgToWs(qmsg.ws, "Bad message"))
+                if not isinstance(qmsg, ClientRxMsg):
+                    print("Unexpected message not handled:", qmsg)
+                    continue
+                self.txQueue.put_nowait(ClientTxMsg("Bad message", qmsg.initiatorWs,
+                                                    initiatorWs=qmsg.initiatorWs))

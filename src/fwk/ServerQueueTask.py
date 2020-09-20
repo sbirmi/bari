@@ -66,14 +66,14 @@ def socketsByPath(path):
 def giByPath(path):
     return GiByPath.get(path, None)
 
-async def clientTxMsg(ws, msg):
-    if ws not in ClientTxQueueByWs:
+async def clientTxMsg(msg, toWs):
+    if toWs not in ClientTxQueueByWs:
         print("clientTxMsg: unable to queue",
               "'%s'" % msg,
-              "for sending to client", ws)
+              "for sending to client", toWs)
         return
-    print("clientTxMsg:", ws, "'%s'" % msg)
-    ClientTxQueueByWs[ws].put_nowait(msg)
+    print("clientTxMsg:", toWs, "'%s'" % msg)
+    ClientTxQueueByWs[toWs].put_nowait(msg)
 
 
 def registerGameClass(gi):

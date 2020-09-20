@@ -1,58 +1,81 @@
-"""Basic message definitions passed within bari"""
+"""Basic message definitions passed within bari."""
 
 # pylint: disable=too-few-public-methods
 # pylint: disable=missing-class-docstring
 
-class Msg:
-#    def __init__(self, fromWs):
-#        """fromWs is non None when the message is initiated by
-#        a websocket and a possible failure message needs to be
-#        sent back to the websocket"""
-#        self.fromWs = fromWs
-    pass
+# Common commands. These should not be game specific
+MTYPE_GAME_STATUS = "GAME-STATUS"
 
-#class MsgToPath(Msg):
-#    def __init__(self, path, jmsg, fromWs=None):
-#        self.path = path
-#        self.jmsg = jmsg
-#        self.fromWs = fromWs
+class MsgBase:
+    def __init__(self, initiatorWs=None):
+        """initiatorWs is non None when the message is directly or
+        indirectly initiated by a websocket (the one you would
+        want to eventually notify about failure to do what
+        was requested). When set to None, it is generated
+        internally as an update
+        """
+        self.initiatorWs = initiatorWs
 
-class MsgFromWs(Msg):
-    def __init__(self, ws, jmsg):
-        self.ws = ws
+    def __str__(self):
+        return self.__class__.__name__ + ": initiatorWs=" + str(self.initiatorWs)
+
+class ClientRxMsg(MsgBase):
+    def __init__(self, jmsg, initiatorWs):
+        """A message received from the client"""
+        super(ClientRxMsg, self).__init__(initiatorWs=initiatorWs)
         self.jmsg = jmsg
 
-class MsgToWs(Msg):
-    def __init__(self, ws, jmsg):
-        self.ws = ws
+    def __str__(self):
+        return super(self.__class__, self).__str__() + " jmsg=" + str(self.jmsg)
+
+class ClientTxMsg(MsgBase):
+    def __init__(self, jmsg, toWs, initiatorWs=None):
+        super(ClientTxMsg, self).__init__(initiatorWs=initiatorWs)
+        self.toWs = toWs
         self.jmsg = jmsg
 
-class InternalRegisterGi(Msg):
-    def __init__(self, gi):
+    def __str__(self):
+        return super(self.__class__, self).__str__() + " jmsg=" + str(self.jmsg) + " toWs=" + str(self.toWs)
+
+class InternalRegisterGi(MsgBase):
+    def __init__(self, gi, initiatorWs=None):
+        super(InternalRegisterGi, self).__init__(initiatorWs=initiatorWs)
         self.gi = gi
 
-class InternalConnectWsToGi(Msg):
+    def __str__(self):
+        return super(self.__class__, self).__str__() + " gi=" + str(self.gi)
+
+class InternalConnectWsToGi(MsgBase):
     def __init__(self, ws):
+        super(InternalConnectWsToGi, self).__init__(initiatorWs=ws)
         self.ws = ws
 
-class InternalDisconnectWsToGi(Msg):
+class InternalDisconnectWsToGi(MsgBase):
     def __init__(self, ws):
+        super(InternalDisconnectWsToGi, self).__init__(initiatorWs=ws)
         self.ws = ws
 
-class InternalHost(Msg):
+class InternalHost(MsgBase):
     """These should only be created from the lobby.
     The jmsg is opaque to the lobby."""
-    def __init__(self, path, fromWs, jmsg):
-        self.path = path
-        self.fromWs = fromWs
+    def __init__(self, jmsg, path, initiatorWs=None):
+        super(InternalHost, self).__init__(initiatorWs=initiatorWs)
         self.jmsg = jmsg
+        self.path = path
 
-class InternalGiStatus(Msg):
+    def __str__(self):
+        return super(self.__class__, self).__str__() + " jmsg=" + str(self.jmsg) + " path=" + self.path
+
+class InternalGiStatus(MsgBase):
     """These are targeted for the lobby.
     This contains the JSON message representation the
     current state of the game. The message is opaque to
     the lobby as it may contain game specific details.
     """
-    def __init__(self, fromPath, jmsg):
+    def __init__(self, jmsg, fromPath):
+        super(InternalGiStatus, self).__init__(initiatorWs=None)
         self.fromPath = fromPath
         self.jmsg = jmsg
+
+    def __str__(self):
+        return super(self.__class__, self).__str__() + " jmsg=" + str(self.jmsg) + " fromPath=" + self.fromPath

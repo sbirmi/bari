@@ -17,17 +17,19 @@ from fwk.ServerQueueTask import (
         giByPath,
         giRxMsg,
         registerGameClass,
-#        socketsByPath,
         txQueue,
         wsPathAdd,
         wsPathRemove,
 )
+from fwk.LobbyPlugin import LOBBY_PATH
 from fwk.Msg import (
         InternalConnectWsToGi,
         InternalDisconnectWsToGi,
+        InternalGiStatus,
+        InternalHost,
         InternalRegisterGi,
-        MsgFromWs,
-        MsgToWs,
+        ClientRxMsg,
+        ClientTxMsg,
 )
 
 
@@ -46,7 +48,7 @@ async def rxClient(clientWs, path):
     path = path.strip("/")
 
     if giByPath(path) is None:
-        await clientTxMsg(clientWs, "Bad path")
+        await clientWs.send("Bad path") # TODO better message
         return
 
     # GxRxQueue + task must exist if the path is valid in the check above
@@ -65,22 +67,19 @@ async def rxClient(clientWs, path):
             try:
                 jmsg = json.loads(message)
             except json.decoder.JSONDecodeError:
-                await clientTxMsg(clientWs, "Bad JSON message")
+                await clientTxMsg("Bad JSON message", clientWs)
                 continue
 
             if not isinstance(jmsg, list):
-                await clientTxMsg(clientWs, "Bad message: not a list")
+                await clientTxMsg("Bad message: not a list", clientWs)
                 continue
 
-            if len(jmsg) <= 1:
-                await clientTxMsg(clientWs, "Bad message: empty list")
+            if not jmsg:
+                await clientTxMsg("Bad message: empty list", clientWs)
                 continue
 
-            if giByPath(jmsg[0]) is None:
-                await clientTxMsg(clientWs, "Unknown path")
-                continue
+            giRxMsg(path, ClientRxMsg(jmsg, initiatorWs=clientWs))
 
-            giRxMsg(jmsg[0], MsgFromWs(clientWs, jmsg))
     except websockets.exceptions.ConnectionClosedError:
         pass
 
@@ -100,20 +99,25 @@ async def giTxQueue(queue):
         qmsg = await queue.get()
         queue.task_done()
 
+        if isinstance(qmsg, InternalHost):
+           if giByPath(qmsg.path) is None:
+              await clientTxMsg("Bad path", qmsg.initiatorWs)
+              continue
+           giRxMsg(qmsg.path, qmsg)
+           continue
+
         if isinstance(qmsg, InternalRegisterGi):
             registerGameClass(qmsg.gi)
             continue
 
+        if isinstance(qmsg, InternalGiStatus):
+            giRxMsg(LOBBY_PATH, qmsg)
+            continue
+
         msg = json.dumps(qmsg.jmsg)
 
-#        if isinstance(qmsg, MsgToPath):
-#            sockets = socketsByPath(LOBBY_PATH)
-#            for ws in sockets:
-#                await clientTxMsg(ws, msg)
-#            continue
-
-        assert isinstance(qmsg, MsgToWs)
-        await clientTxMsg(qmsg.ws, msg)
+        assert isinstance(qmsg, ClientTxMsg)
+        await clientTxMsg(msg, qmsg.toWs)
 
 
 def main():
