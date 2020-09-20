@@ -3,9 +3,6 @@
 # pylint: disable=too-few-public-methods
 # pylint: disable=missing-class-docstring
 
-# Common commands. These should not be game specific
-MTYPE_GAME_STATUS = "GAME-STATUS"
-
 class MsgBase:
     def __init__(self, initiatorWs=None):
         """initiatorWs is non None when the message is directly or

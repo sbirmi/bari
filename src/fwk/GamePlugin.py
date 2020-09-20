@@ -55,13 +55,21 @@ class Plugin:
     # ---------------------------------
     # Message handling
 
+    def postProcessConnect(self, ws):
+        pass
+
     def processConnect(self, ws):
         """Add client websocket as a member in this game instance"""
         self.ws.add(ws)
+        self.postProcessConnect(ws)
+
+    def postProcessDisconnect(self, ws):
+        pass
 
     def processDisconnect(self, ws):
         """Remove client websocket as a member in this game instance"""
         self.ws.remove(ws)
+        self.postProcessDisconnect(ws)
 
     def processMsg(self, qmsg):
         """Act to on the received msg.

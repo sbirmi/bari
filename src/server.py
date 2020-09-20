@@ -47,11 +47,10 @@ async def rxClient(clientWs, path):
     """
     path = path.strip("/")
 
+    # GxRxQueue + task must exist if the path is valid in this check
     if giByPath(path) is None:
         await clientWs.send("Bad path") # TODO better message
         return
-
-    # GxRxQueue + task must exist if the path is valid in the check above
 
     # Register ws <--> path
     wsPathAdd(clientWs, path)

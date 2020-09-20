@@ -1,14 +1,36 @@
 from fwk.GamePlugin import Plugin
 from fwk.Msg import (
+        ClientTxMsg,
         InternalHost,
         InternalGiStatus,
+)
+from fwk.MsgType import (
         MTYPE_GAME_STATUS,
+        MTYPE_HOST,
 )
 
 LOBBY_PATH = "lobby"
 
 class LobbyPlugin(Plugin):
-    giStatusByPath = {}
+    giStatusByPath = {}     # TODO Order these by recently active games?
+
+    def sendGameStatusToOne(self, path, toWs):
+        """Sends game status to one or more client ws"""
+        jmsg = [MTYPE_GAME_STATUS, path] + self.giStatusByPath[path]
+        self.txQueue.put_nowait(ClientTxMsg(jmsg, toWs))
+
+    def sendGameStatusToAll(self, path):
+        self.broadcast([MTYPE_GAME_STATUS, path] + self.giStatusByPath[path])
+
+    def updateGameStatus(self, path, jmsg):
+        if path not in self.giStatusByPath or self.giStatusByPath[path] != jmsg:
+            self.giStatusByPath[path] = jmsg
+            self.sendGameStatusToAll(path)
+
+    def postProcessConnect(self, ws):
+        # Notify of all ongoing game instances
+        for path in self.giStatusByPath:
+            self.sendGameStatusToOne(path, ws)
 
     def processHost(self, hostMsg):
         # Host, <path>, <details>
@@ -23,11 +45,10 @@ class LobbyPlugin(Plugin):
             return True
 
         if isinstance(qmsg, InternalGiStatus):
-            self.giStatusByPath[qmsg.fromPath] = qmsg.jmsg
-            self.broadcast([MTYPE_GAME_STATUS, qmsg.fromPath] + qmsg.jmsg)
+            self.updateGameStatus(qmsg.fromPath, qmsg.jmsg)
             return True
 
-        if qmsg.jmsg[0] == "HOST":
+        if qmsg.jmsg[0] == MTYPE_HOST:
             return self.processHost(qmsg)
 
         return False

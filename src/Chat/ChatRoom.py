@@ -15,9 +15,15 @@ class ChatRoom(Plugin):
 
         return True
 
+    def postProcessConnect(self, ws):
+        self.publishGiStatus()
+
+    def postProcessDisconnect(self, ws):
+        self.publishGiStatus()
+
     def queueSetupComplete(self):
         self.publishGiStatus()
 
     def publishGiStatus(self):
         self.txQueue.put_nowait(InternalGiStatus(
-            [len(self.ws)], self.path))
+            [{"clients": len(self.ws)}], self.path))

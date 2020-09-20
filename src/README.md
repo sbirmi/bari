@@ -92,6 +92,15 @@ hosting a new game, automatically redirect to that game.
 6. How does the Lobby on hosting a game register queues with the main loop?
 
 
+Design Invariants
+-----------------
+
+1. A game instance once created never gets deleted. Thus its Rx queue alsoi doesn't get deleted even after the game completes.
+2. HOST messages should be handled only by the lobby
+3. No client should be able to talk to any path other than the one it connected with directly. All internal sinalling
+   should be done through the use of InternalXXX messages
+
+
 Signalling
 ==========
 
