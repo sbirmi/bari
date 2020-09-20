@@ -1,3 +1,5 @@
+from collections import OrderedDict
+
 from fwk.GamePlugin import Plugin
 from fwk.Msg import (
         ClientTxMsg,
@@ -12,7 +14,7 @@ from fwk.MsgType import (
 LOBBY_PATH = "lobby"
 
 class LobbyPlugin(Plugin):
-    giStatusByPath = {}     # TODO Order these by recently active games?
+    giStatusByPath = OrderedDict()
 
     def sendGameStatusToOne(self, path, toWs):
         """Sends game status to one or more client ws"""
@@ -25,6 +27,7 @@ class LobbyPlugin(Plugin):
     def updateGameStatus(self, path, jmsg):
         if path not in self.giStatusByPath or self.giStatusByPath[path] != jmsg:
             self.giStatusByPath[path] = jmsg
+            self.giStatusByPath.move_to_end(path)
             self.sendGameStatusToAll(path)
 
     def postProcessConnect(self, ws):

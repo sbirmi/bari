@@ -99,11 +99,11 @@ async def giTxQueue(queue):
         queue.task_done()
 
         if isinstance(qmsg, InternalHost):
-           if giByPath(qmsg.path) is None:
-              await clientTxMsg("Bad path", qmsg.initiatorWs)
-              continue
-           giRxMsg(qmsg.path, qmsg)
-           continue
+            if giByPath(qmsg.path) is None:
+                await clientTxMsg("Bad path", qmsg.initiatorWs)
+                continue
+            giRxMsg(qmsg.path, qmsg)
+            continue
 
         if isinstance(qmsg, InternalRegisterGi):
             registerGameClass(qmsg.gi)

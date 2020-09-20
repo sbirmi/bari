@@ -14,6 +14,7 @@ class MsgBase:
         self.initiatorWs = initiatorWs
 
     def __str__(self):
+        # pylint: disable=bad-super-call
         return self.__class__.__name__ + ": initiatorWs=" + str(self.initiatorWs)
 
 class ClientRxMsg(MsgBase):
@@ -23,6 +24,7 @@ class ClientRxMsg(MsgBase):
         self.jmsg = jmsg
 
     def __str__(self):
+        # pylint: disable=bad-super-call
         return super(self.__class__, self).__str__() + " jmsg=" + str(self.jmsg)
 
 class ClientTxMsg(MsgBase):
@@ -32,7 +34,9 @@ class ClientTxMsg(MsgBase):
         self.jmsg = jmsg
 
     def __str__(self):
-        return super(self.__class__, self).__str__() + " jmsg=" + str(self.jmsg) + " toWs=" + str(self.toWs)
+        # pylint: disable=bad-super-call
+        return super(self.__class__, self).__str__() + " jmsg=" + str(self.jmsg) + \
+                " toWs=" + str(self.toWs)
 
 class InternalRegisterGi(MsgBase):
     def __init__(self, gi, initiatorWs=None):
@@ -40,6 +44,7 @@ class InternalRegisterGi(MsgBase):
         self.gi = gi
 
     def __str__(self):
+        # pylint: disable=bad-super-call
         return super(self.__class__, self).__str__() + " gi=" + str(self.gi)
 
 class InternalConnectWsToGi(MsgBase):
@@ -61,7 +66,9 @@ class InternalHost(MsgBase):
         self.path = path
 
     def __str__(self):
-        return super(self.__class__, self).__str__() + " jmsg=" + str(self.jmsg) + " path=" + self.path
+        # pylint: disable=bad-super-call
+        return super(self.__class__, self).__str__() + " jmsg=" + str(self.jmsg) + \
+                " path=" + self.path
 
 class InternalGiStatus(MsgBase):
     """These are targeted for the lobby.
@@ -75,4 +82,6 @@ class InternalGiStatus(MsgBase):
         self.jmsg = jmsg
 
     def __str__(self):
-        return super(self.__class__, self).__str__() + " jmsg=" + str(self.jmsg) + " fromPath=" + self.fromPath
+        # pylint: disable=bad-super-call
+        return super(self.__class__, self).__str__() + " jmsg=" + str(self.jmsg) + \
+                " fromPath=" + self.fromPath
