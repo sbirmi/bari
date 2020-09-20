@@ -1,6 +1,14 @@
+"""Defines Plugin -- the base for any plugin that connects to bari.
+The Plugin is used as the base for:
+1. the main lobby
+2. the GameLobbyPlugin (defined here), base for a Game Lobby
+3. the GamePlugin (defined here), base for a Game
+"""
+
 from fwk.Msg import (
         InternalConnectWsToGi,
         InternalDisconnectWsToGi,
+        InternalHost,
         ClientRxMsg,
         ClientTxMsg,
 )
@@ -30,33 +38,34 @@ class Plugin:
     # ---------------------------------
     # Startup related
 
-    def queueSetupComplete(self):
-        pass
+    def postQueueSetup(self):
+        """Additional logic to run after RX and TX queues are
+        setup for a plugin"""
 
     def setRxTxQueues(self, rxQueue, txQueue):
+        """Setup RX and TX queue for a plugin"""
         assert not self.rxQueue
         assert not self.txQueue
         assert rxQueue
         assert txQueue
         self.rxQueue = rxQueue
         self.txQueue = txQueue
-        self.queueSetupComplete()
+        self.postQueueSetup()
 
 
     # ---------------------------------
     # Message sending helpers
 
     def broadcast(self, jmsg, initiatorWs=None):
+        """Send a message to all clients of a Plugin"""
         for toWs in self.ws:
-            self.txQueue.put_nowait(
-                    ClientTxMsg(jmsg, toWs,
-                        initiatorWs=initiatorWs))
+            self.txQueue.put_nowait(ClientTxMsg(jmsg, toWs, initiatorWs=initiatorWs))
 
     # ---------------------------------
     # Message handling
 
     def postProcessConnect(self, ws):
-        pass
+        """Additional logic to run after a ws connects"""
 
     def processConnect(self, ws):
         """Add client websocket as a member in this game instance"""
@@ -64,7 +73,7 @@ class Plugin:
         self.postProcessConnect(ws)
 
     def postProcessDisconnect(self, ws):
-        pass
+        """Additional logic to run after a ws disconnects"""
 
     def processDisconnect(self, ws):
         """Remove client websocket as a member in this game instance"""
@@ -89,6 +98,8 @@ class Plugin:
         return False
 
     async def worker(self):
+        """The worker task for a plugin. All messages should be processed.
+        Any unhandled message returns a bad message to the sender"""
         print("{}.worker() ready".format(self.path))
         while True:
             qmsg = await self.rxQueue.get()
@@ -102,3 +113,30 @@ class Plugin:
                     continue
                 self.txQueue.put_nowait(ClientTxMsg("Bad message", qmsg.initiatorWs,
                                                     initiatorWs=qmsg.initiatorWs))
+
+
+class GameLobbyPlugin(Plugin):
+    """Base class for a Game Lobby that allows hosting games"""
+    def processHost(self, qmsg):
+        """A MTYPE_HOST message should be handled here"""
+        raise NotImplementedError
+
+    def processMsg(self, qmsg):
+        if super(GameLobbyPlugin, self).processMsg(qmsg):
+            return True
+
+        if isinstance(qmsg, InternalHost):
+            return self.processHost(qmsg)
+
+        return False
+
+
+class GamePlugin(Plugin):
+    """Base class for a Game Instance"""
+
+    def postQueueSetup(self):
+        self.publishGiStatus()
+
+    def publishGiStatus(self):
+        """Publish this game instance's status to the lobby"""
+        raise NotImplementedError

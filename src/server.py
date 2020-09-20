@@ -31,13 +31,11 @@ from fwk.Msg import (
         ClientRxMsg,
         ClientTxMsg,
 )
-
-
+from fwk.MsgType import (
+        MTYPE_ERROR,
+)
 import fwk.LobbyPlugin
 import Chat.ChatLobbyPlugin
-
-
-LOBBY = "lobby"
 
 
 async def rxClient(clientWs, path):
@@ -49,7 +47,7 @@ async def rxClient(clientWs, path):
 
     # GxRxQueue + task must exist if the path is valid in this check
     if giByPath(path) is None:
-        await clientWs.send("Bad path") # TODO better message
+        await clientWs.send(json.dumps([MTYPE_ERROR, "Bad path"]))
         return
 
     # Register ws <--> path
@@ -66,15 +64,15 @@ async def rxClient(clientWs, path):
             try:
                 jmsg = json.loads(message)
             except json.decoder.JSONDecodeError:
-                await clientTxMsg("Bad JSON message", clientWs)
+                await clientTxMsg([MTYPE_ERROR, "Bad JSON message"], clientWs)
                 continue
 
             if not isinstance(jmsg, list):
-                await clientTxMsg("Bad message: not a list", clientWs)
+                await clientTxMsg([MTYPE_ERROR, "Bad message: not a list"], clientWs)
                 continue
 
             if not jmsg:
-                await clientTxMsg("Bad message: empty list", clientWs)
+                await clientTxMsg([MTYPE_ERROR, "Bad message: empty list"], clientWs)
                 continue
 
             giRxMsg(path, ClientRxMsg(jmsg, initiatorWs=clientWs))
