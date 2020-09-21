@@ -15,8 +15,8 @@ from fwk.Msg import (
 )
 
 class LobbyPluginTest(unittest.TestCase):
-    connWs1 = None
-    connWs2 = None
+    connWs1 = 101
+    connWs2 = 102
 
     def setUp(self):
         self.plugin = plugin()
@@ -80,8 +80,6 @@ class LobbyPluginTest(unittest.TestCase):
 
     def testHandleGiStatusWithConnections(self):
         """Handling of InternalGiStatus"""
-        self.connWs1 = 101
-        self.connWs2 = 102
         self.plugin.ws.add(self.connWs1)
         self.plugin.ws.add(self.connWs2)
 
@@ -120,8 +118,6 @@ class LobbyPluginTest(unittest.TestCase):
         connects when (connWs1) is already connected"""
         self.plugin.giStatusByPath["foo:1"] = [True]
 
-        self.connWs1 = 101
-        self.connWs2 = 102
         self.plugin.ws.add(self.connWs1)
 
         # Process InternalGiStatus with two clients connected
