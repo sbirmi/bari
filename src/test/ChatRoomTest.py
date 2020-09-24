@@ -48,8 +48,8 @@ class ChatRoomTest(unittest.TestCase, MsgTestLib):
         """Received messages are broadcast to all clients"""
         self.testInstantiation()
 
-        self.plugin.ws.add(self.connWs1)
-        self.plugin.ws.add(self.connWs2)
+        self.plugin.conns.addConn(self.connWs1)
+        self.plugin.conns.addConn(self.connWs2)
 
         fakeWs = 55
         msg = ClientRxMsg(["foo", 2, True, {"count": 3}], initiatorWs=fakeWs)

@@ -28,6 +28,10 @@ class Connections:
         self._msgSrcs = set()
         self._wss = set()
 
+    def count(self):
+        """Number of connections being tracked"""
+        return len(self._wss)
+
     @property
     def msgSrcs(self):
         """Accessor for internal messages"""

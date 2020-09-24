@@ -71,8 +71,8 @@ class LobbyPluginTest(unittest.TestCase, MsgTestLib):
 
     def testHandleGiStatusWithConnections(self):
         """Handling of InternalGiStatus"""
-        self.plugin.ws.add(self.connWs1)
-        self.plugin.ws.add(self.connWs2)
+        self.plugin.conns.addConn(self.connWs1)
+        self.plugin.conns.addConn(self.connWs2)
 
         # Process InternalGiStatus with two clients connected
         msg = InternalGiStatus([], "foo:1")
@@ -101,7 +101,7 @@ class LobbyPluginTest(unittest.TestCase, MsgTestLib):
         connects when (connWs1) is already connected"""
         self.plugin.giStatusByPath["foo:1"] = [True]
 
-        self.plugin.ws.add(self.connWs1)
+        self.plugin.conns.addConn(self.connWs1)
 
         # Process InternalGiStatus with two clients connected
         msg = InternalConnectWsToGi(self.connWs2)

@@ -5,6 +5,10 @@ The Plugin is used as the base for:
 3. the GamePlugin (defined here), base for a Game
 """
 
+from fwk.MsgSrc import (
+        Connections,
+        Jmai,
+)
 from fwk.Msg import (
         InternalConnectWsToGi,
         InternalDisconnectWsToGi,
@@ -33,7 +37,7 @@ class Plugin:
         self.name = name
         self.rxQueue = None
         self.txQueue = None
-        self.ws = set()
+        self.conns = None
 
     # ---------------------------------
     # Startup related
@@ -50,6 +54,7 @@ class Plugin:
         assert txQueue
         self.rxQueue = rxQueue
         self.txQueue = txQueue
+        self.conns = Connections(self.txQueue)
         self.postQueueSetup()
 
 
@@ -58,8 +63,7 @@ class Plugin:
 
     def broadcast(self, jmsg, initiatorWs=None):
         """Send a message to all clients of a Plugin"""
-        if self.ws:
-            self.txQueue.put_nowait(ClientTxMsg(jmsg, self.ws, initiatorWs=initiatorWs))
+        self.conns.send([Jmai(jmsg, initiatorWs)])
 
     # ---------------------------------
     # Message handling
@@ -69,7 +73,7 @@ class Plugin:
 
     def processConnect(self, ws):
         """Add client websocket as a member in this game instance"""
-        self.ws.add(ws)
+        self.conns.addConn(ws)
         self.postProcessConnect(ws)
 
     def postProcessDisconnect(self, ws):
@@ -77,7 +81,7 @@ class Plugin:
 
     def processDisconnect(self, ws):
         """Remove client websocket as a member in this game instance"""
-        self.ws.remove(ws)
+        self.conns.delConn(ws)
         self.postProcessDisconnect(ws)
 
     def processMsg(self, qmsg):
