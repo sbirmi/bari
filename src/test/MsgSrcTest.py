@@ -10,6 +10,7 @@ from fwk.Msg import ClientTxMsg
 from fwk.MsgSrc import (
         Connections,
         MsgSrc,
+        Jmai,
 )
 
 clientWs1 = 101
@@ -44,13 +45,15 @@ class MsgSrcConnectionsTest(unittest.TestCase, MsgTestLib):
         self.assertGiTxQueueMsgs(self.txq, [])
 
         # Set messages in msgSrc
-        msgSrc1.setMsgs([[1], [2]], initiatorWs=clientWs3)
+        msgSrc1.setMsgs([Jmai([1], initiatorWs=clientWs3),
+                         Jmai([2], initiatorWs=clientWs3)])
         self.assertGiTxQueueMsgs(self.txq, [ClientTxMsg([1], {clientWs1}, initiatorWs=clientWs3),
                                             ClientTxMsg([2], {clientWs1}, initiatorWs=clientWs3)])
 
         # Adding msgSrc with previous messages
         msgSrc2 = MsgSrc(self.conns)
-        msgSrc2.setMsgs([[True], [False]])
+        msgSrc2.setMsgs([Jmai([True], initiatorWs=None),
+                         Jmai([False], initiatorWs=None)])
         self.assertGiTxQueueMsgs(self.txq, [ClientTxMsg([True], {clientWs1}),
                                             ClientTxMsg([False], {clientWs1})])
 
@@ -61,8 +64,8 @@ class MsgSrcConnectionsTest(unittest.TestCase, MsgTestLib):
                                             ClientTxMsg([True], {clientWs2}, initiatorWs=None),
                                             ClientTxMsg([False], {clientWs2}, initiatorWs=None)})
 
-        # Adding msgSrc with previous messages
-        msgSrc2.setMsgs([["yes"]])
+        # Adding msgSrc with state preset
+        msgSrc2.setMsgs([Jmai(["yes"], initiatorWs=None)])
         self.assertGiTxQueueMsgs(self.txq, [ClientTxMsg(["yes"], {clientWs1, clientWs2})])
 
         # Delete msgSrc

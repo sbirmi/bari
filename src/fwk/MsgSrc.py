@@ -12,7 +12,11 @@ each MsgSrc to the new connection. Any change to MsgSrc
 is sent to all websockets.
 """
 
+from collections import namedtuple
+
 from fwk.Msg import ClientTxMsg
+
+Jmai = namedtuple("JmsgAndInitiator", ["jmsg", "initiatorWs"])
 
 class Connections:
     """A collection of websockets and message sources
@@ -32,8 +36,8 @@ class Connections:
     def addMsgSrc(self, msgSrc):
         """Register a new MsgSrc for all websockets"""
         self._msgSrcs.add(msgSrc)
-        jmsgs, initiatorWs = msgSrc.getMsgs()
-        self.send(jmsgs, initiatorWs=initiatorWs)
+        jmaiList = msgSrc.getMsgs()
+        self.send(jmaiList)
 
     def delMsgSrc(self, msgSrc):
         """Remove a MsgSrc for all websockets"""
@@ -44,15 +48,15 @@ class Connections:
         """Add a websocket to the set of connections"""
         self._wss.add(ws)
         for msgSrc in self._msgSrcs:
-            jmsgs, initiatorWs = msgSrc.getMsgs()
-            self.send(jmsgs, initiatorWs=initiatorWs, wss={ws})
+            jmaiList = msgSrc.getMsgs()
+            self.send(jmaiList, wss={ws})
 
     def delConn(self, ws):
         """Remove a websocket from the set of connections"""
         if ws in self._wss:
             self._wss.remove(ws)
 
-    def send(self, jmsgs, initiatorWs=None, wss=None):
+    def send(self, jmaiList, wss=None):
         """Send the messages to a subset (or all) connections
         Arguments
         ---------
@@ -66,8 +70,8 @@ class Connections:
         if not wss:
             return
 
-        for jmsg in jmsgs:
-            self._txQueue.put_nowait(ClientTxMsg(jmsg, wss, initiatorWs=initiatorWs))
+        for jmai in jmaiList:
+            self._txQueue.put_nowait(ClientTxMsg(jmai.jmsg, wss, initiatorWs=jmai.initiatorWs))
 
 class MsgSrc:
     """A source of messages that needs to be sent to
@@ -75,19 +79,18 @@ class MsgSrc:
     """
     def __init__(self, conns):
         self._conns = conns
-        self._jmsgs = []
+        self._jmaiList = []
         self._lastInitiatorWs = None
         self._conns.addMsgSrc(self)
 
     def __del__(self):
         self._conns.delMsgSrc(self)
 
-    def setMsgs(self, jmsgs, initiatorWs=None):
-        """Buffer messages (and initiatorWs)"""
-        self._jmsgs = jmsgs
-        self._lastInitiatorWs = initiatorWs
-        self._conns.send(self._jmsgs, initiatorWs=self._lastInitiatorWs)
+    def setMsgs(self, jmaiList):
+        """Buffer messages each with initiator"""
+        self._jmaiList = jmaiList
+        self._conns.send(self._jmaiList)
 
     def getMsgs(self):
         """Get messages and initiator websocket for the messages"""
-        return self._jmsgs, self._lastInitiatorWs
+        return self._jmaiList
