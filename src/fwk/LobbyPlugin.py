@@ -45,7 +45,7 @@ class LobbyPlugin(Plugin):
     def sendGameStatusToOne(self, path, toWs):
         """Sends game instance status to one connection"""
         jmsg = [MTYPE_GAME_STATUS, path] + self.giStatusByPath[path]
-        self.txQueue.put_nowait(ClientTxMsg(jmsg, toWs))
+        self.txQueue.put_nowait(ClientTxMsg(jmsg, {toWs}))
 
     def sendGameStatusToAll(self, path):
         """Broadcast 'path' game instance to all connections"""

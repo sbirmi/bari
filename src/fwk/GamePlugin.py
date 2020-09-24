@@ -58,8 +58,8 @@ class Plugin:
 
     def broadcast(self, jmsg, initiatorWs=None):
         """Send a message to all clients of a Plugin"""
-        for toWs in self.ws:
-            self.txQueue.put_nowait(ClientTxMsg(jmsg, toWs, initiatorWs=initiatorWs))
+        if self.ws:
+            self.txQueue.put_nowait(ClientTxMsg(jmsg, self.ws, initiatorWs=initiatorWs))
 
     # ---------------------------------
     # Message handling

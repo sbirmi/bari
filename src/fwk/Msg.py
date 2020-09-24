@@ -28,15 +28,15 @@ class ClientRxMsg(MsgBase):
         return super(self.__class__, self).__str__() + " jmsg=" + str(self.jmsg)
 
 class ClientTxMsg(MsgBase):
-    def __init__(self, jmsg, toWs, initiatorWs=None):
+    def __init__(self, jmsg, toWss, initiatorWs=None):
         super(ClientTxMsg, self).__init__(initiatorWs=initiatorWs)
-        self.toWs = toWs
+        self.toWss = toWss
         self.jmsg = jmsg
 
     def __str__(self):
         # pylint: disable=bad-super-call
         return super(self.__class__, self).__str__() + " jmsg=" + str(self.jmsg) + \
-                " toWs=" + str(self.toWs)
+                " toWss=" + str(self.toWss)
 
 class InternalRegisterGi(MsgBase):
     def __init__(self, gi, initiatorWs=None):

@@ -12,9 +12,8 @@ class ChatRoom(GamePlugin):
         if super(ChatRoom, self).processMsg(qmsg):
             return True
 
-        for toWs in self.ws:
-            self.txQueue.put_nowait(ClientTxMsg(qmsg.jmsg, toWs,
-                                                initiatorWs=qmsg.initiatorWs))
+        self.txQueue.put_nowait(ClientTxMsg(qmsg.jmsg, self.ws,
+                                            initiatorWs=qmsg.initiatorWs))
 
         return True
 

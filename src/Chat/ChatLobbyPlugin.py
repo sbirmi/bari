@@ -16,7 +16,7 @@ class ChatLobbyPlugin(GameLobbyPlugin):
     def processHost(self, qmsg):
         if qmsg.jmsg:
             self.txQueue.put_nowait(ClientTxMsg(
-                [MTYPE_HOST_BAD, "Unexpected parameters"], qmsg.initiatorWs,
+                [MTYPE_HOST_BAD, "Unexpected parameters"], {qmsg.initiatorWs},
                 initiatorWs=qmsg.initiatorWs))
             return True
 

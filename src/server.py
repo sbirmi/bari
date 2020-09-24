@@ -114,7 +114,8 @@ async def giTxQueue(queue):
         msg = json.dumps(qmsg.jmsg)
 
         assert isinstance(qmsg, ClientTxMsg)
-        await clientTxMsg(msg, qmsg.toWs)
+        for toWs in qmsg.toWss:
+            await clientTxMsg(msg, toWs)
 
 
 def main():

@@ -87,23 +87,20 @@ class LobbyPluginTest(unittest.TestCase):
         msg = InternalGiStatus([], "foo:1")
         self.plugin.processMsg(msg)
 
-        txMsgs = [self.txq.get_nowait(), self.txq.get_nowait()]
-        self.assertListEqual([txm.jmsg for txm in txMsgs],
-                             [["GAME-STATUS", "foo:1"], ["GAME-STATUS", "foo:1"]])
-        self.assertSetEqual({txm.toWs for txm in txMsgs}, {self.connWs1, self.connWs2})
-        self.assertListEqual([txm.initiatorWs for txm in txMsgs], [None, None])
+        txmsg = self.txq.get_nowait()
+        self.assertEqual(txmsg.jmsg, ["GAME-STATUS", "foo:1"])
+        self.assertSetEqual(txmsg.toWss, {self.connWs1, self.connWs2})
+        self.assertIs(txmsg.initiatorWs, None)
         self.assertTrue(self.txq.empty())
 
         # Process InternalGiStatus with two clients connected: updating an existing game
         msg = InternalGiStatus([{"count": 10}], "foo:1")
         self.plugin.processMsg(msg)
 
-        txMsgs = [self.txq.get_nowait(), self.txq.get_nowait()]
-        self.assertListEqual([txm.jmsg for txm in txMsgs],
-                             [["GAME-STATUS", "foo:1", {"count": 10}],
-                              ["GAME-STATUS", "foo:1", {"count": 10}]])
-        self.assertSetEqual({txm.toWs for txm in txMsgs}, {self.connWs1, self.connWs2})
-        self.assertListEqual([txm.initiatorWs for txm in txMsgs], [None, None])
+        txmsg = self.txq.get_nowait()
+        self.assertEqual(txmsg.jmsg, ["GAME-STATUS", "foo:1", {"count": 10}])
+        self.assertSetEqual(txmsg.toWss, {self.connWs1, self.connWs2})
+        self.assertIs(txmsg.initiatorWs, None)
         self.assertTrue(self.txq.empty())
 
         # Processing same InternalGiStatus with two clients connected
@@ -124,9 +121,9 @@ class LobbyPluginTest(unittest.TestCase):
         msg = InternalConnectWsToGi(self.connWs2)
         self.plugin.processMsg(msg)
 
-        txm = self.txq.get_nowait()
+        txmsg = self.txq.get_nowait()
         self.assertTrue(self.txq.empty())
-        self.assertIsInstance(txm, ClientTxMsg)
-        self.assertEqual(txm.jmsg, ["GAME-STATUS", "foo:1", True])
-        self.assertEqual(txm.toWs, self.connWs2)
-        self.assertEqual(txm.initiatorWs, None)
+        self.assertIsInstance(txmsg, ClientTxMsg)
+        self.assertEqual(txmsg.jmsg, ["GAME-STATUS", "foo:1", True])
+        self.assertEqual(txmsg.toWss, {self.connWs2})
+        self.assertEqual(txmsg.initiatorWs, None)

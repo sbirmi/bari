@@ -69,12 +69,9 @@ class ChatRoomTest(unittest.TestCase):
         fakeWs = 55
         msg = ClientRxMsg(["foo", 2, True, {"count": 3}], initiatorWs=fakeWs)
         self.plugin.processMsg(msg)
-        txmsgs = [self.txq.get_nowait(), self.txq.get_nowait()]
-        self.assertIsInstance(txmsgs[0], ClientTxMsg)
-        self.assertIsInstance(txmsgs[1], ClientTxMsg)
-        self.assertListEqual([tm.jmsg for tm in txmsgs],
-                             [["foo", 2, True, {"count": 3}],
-                              ["foo", 2, True, {"count": 3}]])
-        self.assertListEqual([tm.initiatorWs for tm in txmsgs], [fakeWs, fakeWs])
-        self.assertSetEqual({tm.toWs for tm in txmsgs}, {self.connWs1, self.connWs2})
+        txmsg = self.txq.get_nowait()
+        self.assertIsInstance(txmsg, ClientTxMsg)
+        self.assertEqual(txmsg.jmsg, ["foo", 2, True, {"count": 3}])
+        self.assertEqual(txmsg.initiatorWs, fakeWs)
+        self.assertSetEqual(txmsg.toWss, {self.connWs1, self.connWs2})
         self.assertTrue(self.txq.empty())

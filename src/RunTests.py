@@ -10,4 +10,4 @@ from test.LobbyPluginTest import *
 from test.ChatRoomTest import *
 
 if __name__ == "__main__":
-    unittest.main()
+    unittest.main(failfast=True)
