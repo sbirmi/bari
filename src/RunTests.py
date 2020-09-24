@@ -7,6 +7,7 @@ Run unittests for bari
 # pylint: disable=unused-wildcard-import
 
 from test.LobbyPluginTest import *
+from test.MsgSrcTest import *
 from test.ChatRoomTest import *
 
 if __name__ == "__main__":

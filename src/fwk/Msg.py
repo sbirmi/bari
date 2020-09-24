@@ -13,7 +13,15 @@ class MsgBase:
         """
         self.initiatorWs = initiatorWs
 
+    def __eq__(self, other):
+        return str(self) == str(other)
+
+    def __hash__(self):
+        return str(self).__hash__()
+
     def __str__(self):
+        """Each message must have a unique representation of the content.
+        This function is used to implement Msg comparison"""
         # pylint: disable=bad-super-call
         return self.__class__.__name__ + ": initiatorWs=" + str(self.initiatorWs)
 
