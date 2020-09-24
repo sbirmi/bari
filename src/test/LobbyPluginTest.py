@@ -5,6 +5,7 @@
 import asyncio
 import unittest
 
+from test.MsgTestLib import MsgTestLib
 from fwk.LobbyPlugin import plugin
 from fwk.Msg import (
         ClientRxMsg,
@@ -14,7 +15,7 @@ from fwk.Msg import (
         InternalGiStatus,
 )
 
-class LobbyPluginTest(unittest.TestCase):
+class LobbyPluginTest(unittest.TestCase, MsgTestLib):
     connWs1 = 101
     connWs2 = 102
 
@@ -27,7 +28,7 @@ class LobbyPluginTest(unittest.TestCase):
     def testInstantiation(self):
         """Test attributes of the plugin"""
         self.assertEqual(self.plugin.path, "lobby")
-        self.assertTrue(self.txq.empty())
+        self.assertGiTxQueueMsgs(self.txq, [])
         self.assertTrue(not self.plugin.giStatusByPath)
 
     def testHandleHost(self):
@@ -36,43 +37,33 @@ class LobbyPluginTest(unittest.TestCase):
         msg = ClientRxMsg(["HOST", "foo"], initiatorWs=fakeWs)
         self.plugin.processMsg(msg)
 
-        txmsg = self.txq.get_nowait()
-        self.assertIsInstance(txmsg, InternalHost)
-        self.assertEqual(txmsg.jmsg, [])
-        self.assertEqual(txmsg.path, "foo")
-        self.assertEqual(txmsg.initiatorWs, fakeWs)
-        self.assertTrue(self.txq.empty())
-
+        self.assertGiTxQueueMsgs(self.txq, [InternalHost([], "foo", initiatorWs=fakeWs)])
 
         msg = ClientRxMsg(["HOST", "bar", {1: 2, 3: 4}], initiatorWs=fakeWs)
         self.plugin.processMsg(msg)
 
-        txmsg = self.txq.get_nowait()
-        self.assertIsInstance(txmsg, InternalHost)
-        self.assertEqual(txmsg.jmsg, [{1: 2, 3: 4}])
-        self.assertEqual(txmsg.path, "bar")
-        self.assertEqual(txmsg.initiatorWs, fakeWs)
-        self.assertTrue(self.txq.empty())
+        self.assertGiTxQueueMsgs(self.txq, [InternalHost([{1: 2, 3: 4}], "bar",
+                                                         initiatorWs=fakeWs)])
 
     def testHandleGiStatusNoConnections(self):
         """Handling of InternalGiStatus"""
         # Add a game with empty status
         msg = InternalGiStatus([], "foo:1")
         self.plugin.processMsg(msg)
-        self.assertTrue(self.txq.empty())
+        self.assertGiTxQueueMsgs(self.txq, [])
         self.assertDictEqual(dict(self.plugin.giStatusByPath), {"foo:1": []})
 
         # Update existing game
         msg = InternalGiStatus([True], "foo:1")
         self.plugin.processMsg(msg)
-        self.assertTrue(self.txq.empty())
+        self.assertGiTxQueueMsgs(self.txq, [])
         self.assertDictEqual(dict(self.plugin.giStatusByPath),
                              {"foo:1": [True]})
 
         # Add a different game with non-empty status
         msg = InternalGiStatus([{"count": 10}], "bar:2")
         self.plugin.processMsg(msg)
-        self.assertTrue(self.txq.empty())
+        self.assertGiTxQueueMsgs(self.txq, [])
 
         self.assertDictEqual(dict(self.plugin.giStatusByPath),
                              {"foo:1": [True],
@@ -87,28 +78,23 @@ class LobbyPluginTest(unittest.TestCase):
         msg = InternalGiStatus([], "foo:1")
         self.plugin.processMsg(msg)
 
-        txmsg = self.txq.get_nowait()
-        self.assertEqual(txmsg.jmsg, ["GAME-STATUS", "foo:1"])
-        self.assertSetEqual(txmsg.toWss, {self.connWs1, self.connWs2})
-        self.assertIs(txmsg.initiatorWs, None)
-        self.assertTrue(self.txq.empty())
+        self.assertGiTxQueueMsgs(self.txq, [ClientTxMsg(["GAME-STATUS", "foo:1"],
+                                                        {self.connWs1, self.connWs2},
+                                                        initiatorWs=None)])
 
         # Process InternalGiStatus with two clients connected: updating an existing game
         msg = InternalGiStatus([{"count": 10}], "foo:1")
         self.plugin.processMsg(msg)
 
-        txmsg = self.txq.get_nowait()
-        self.assertEqual(txmsg.jmsg, ["GAME-STATUS", "foo:1", {"count": 10}])
-        self.assertSetEqual(txmsg.toWss, {self.connWs1, self.connWs2})
-        self.assertIs(txmsg.initiatorWs, None)
-        self.assertTrue(self.txq.empty())
+        self.assertGiTxQueueMsgs(self.txq, [ClientTxMsg(["GAME-STATUS", "foo:1", {"count": 10}],
+                                                        {self.connWs1, self.connWs2},
+                                                        initiatorWs=None)])
 
         # Processing same InternalGiStatus with two clients connected
         # should not create messages
         msg = InternalGiStatus([{"count": 10}], "foo:1")
         self.plugin.processMsg(msg)
-
-        self.assertTrue(self.txq.empty())
+        self.assertGiTxQueueMsgs(self.txq, [])
 
     def testHandleNewConnection(self):
         """Handling of InternalGiStatus when a new client (connWs2)
@@ -120,10 +106,5 @@ class LobbyPluginTest(unittest.TestCase):
         # Process InternalGiStatus with two clients connected
         msg = InternalConnectWsToGi(self.connWs2)
         self.plugin.processMsg(msg)
-
-        txmsg = self.txq.get_nowait()
-        self.assertTrue(self.txq.empty())
-        self.assertIsInstance(txmsg, ClientTxMsg)
-        self.assertEqual(txmsg.jmsg, ["GAME-STATUS", "foo:1", True])
-        self.assertEqual(txmsg.toWss, {self.connWs2})
-        self.assertEqual(txmsg.initiatorWs, None)
+        self.assertGiTxQueueMsgs(self.txq, [ClientTxMsg(["GAME-STATUS", "foo:1", True],
+                                                        {self.connWs2}, initiatorWs=None)])
