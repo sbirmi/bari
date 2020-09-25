@@ -5,6 +5,7 @@
 import asyncio
 import unittest
 
+from test.MsgTestLib import MsgTestLib
 from Chat.ChatRoom import ChatRoom
 from fwk.Msg import (
         ClientRxMsg,
@@ -14,7 +15,7 @@ from fwk.Msg import (
         InternalGiStatus,
 )
 
-class ChatRoomTest(unittest.TestCase):
+class ChatRoomTest(unittest.TestCase, MsgTestLib):
     connWs1 = 101
     connWs2 = 102
 
@@ -26,11 +27,7 @@ class ChatRoomTest(unittest.TestCase):
 
     def testInstantiation(self):
         """Test attributes of the plugin"""
-        txmsg = self.txq.get_nowait()
-        self.assertIsInstance(txmsg, InternalGiStatus)
-        self.assertEqual(txmsg.fromPath, "chat:1")
-        self.assertListEqual(txmsg.jmsg, [{"clients": 0}])
-        self.assertTrue(self.txq.empty())
+        self.assertGiTxQueueMsgs(self.txq, [InternalGiStatus([{"clients": 0}], "chat:1")])
 
     def testHandleConnection(self):
         """InternalGiStatus is sent when websockets connect/disconnect
@@ -40,38 +37,23 @@ class ChatRoomTest(unittest.TestCase):
         # Connect a websocket
         msg = InternalConnectWsToGi(self.connWs1)
         self.plugin.processMsg(msg)
-
-        txmsg = self.txq.get_nowait()
-        self.assertIsInstance(txmsg, InternalGiStatus)
-        self.assertEqual(txmsg.fromPath, "chat:1")
-        self.assertEqual(txmsg.initiatorWs, None)
-        self.assertListEqual(txmsg.jmsg, [{'clients': 1}])
-        self.assertTrue(self.txq.empty())
+        self.assertGiTxQueueMsgs(self.txq, [InternalGiStatus([{"clients": 1}], "chat:1")])
 
         # Disconnect a websocket
         msg = InternalDisconnectWsToGi(self.connWs1)
         self.plugin.processMsg(msg)
-
-        txmsg = self.txq.get_nowait()
-        self.assertIsInstance(txmsg, InternalGiStatus)
-        self.assertEqual(txmsg.fromPath, "chat:1")
-        self.assertEqual(txmsg.initiatorWs, None)
-        self.assertListEqual(txmsg.jmsg, [{'clients': 0}])
-        self.assertTrue(self.txq.empty())
+        self.assertGiTxQueueMsgs(self.txq, [InternalGiStatus([{"clients": 0}], "chat:1")])
 
     def testHandleMsg(self):
-        """Handling of InternalGiStatus"""
+        """Received messages are broadcast to all clients"""
         self.testInstantiation()
 
-        self.plugin.ws.add(self.connWs1)
-        self.plugin.ws.add(self.connWs2)
+        self.plugin.conns.addConn(self.connWs1)
+        self.plugin.conns.addConn(self.connWs2)
 
         fakeWs = 55
         msg = ClientRxMsg(["foo", 2, True, {"count": 3}], initiatorWs=fakeWs)
         self.plugin.processMsg(msg)
-        txmsg = self.txq.get_nowait()
-        self.assertIsInstance(txmsg, ClientTxMsg)
-        self.assertEqual(txmsg.jmsg, ["foo", 2, True, {"count": 3}])
-        self.assertEqual(txmsg.initiatorWs, fakeWs)
-        self.assertSetEqual(txmsg.toWss, {self.connWs1, self.connWs2})
-        self.assertTrue(self.txq.empty())
+        self.assertGiTxQueueMsgs(self.txq, [ClientTxMsg(["foo", 2, True, {"count": 3}],
+                                                        {self.connWs1, self.connWs2},
+                                                        initiatorWs=fakeWs)])

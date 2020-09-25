@@ -1,10 +1,7 @@
 """Defines a chat room in bari"""
 
 from fwk.GamePlugin import GamePlugin
-from fwk.Msg import (
-        ClientTxMsg,
-        InternalGiStatus,
-)
+from fwk.Msg import InternalGiStatus
 
 class ChatRoom(GamePlugin):
     """Defines a chat room"""
@@ -12,9 +9,7 @@ class ChatRoom(GamePlugin):
         if super(ChatRoom, self).processMsg(qmsg):
             return True
 
-        self.txQueue.put_nowait(ClientTxMsg(qmsg.jmsg, self.ws,
-                                            initiatorWs=qmsg.initiatorWs))
-
+        self.broadcast(qmsg.jmsg, initiatorWs=qmsg.initiatorWs)
         return True
 
     def postProcessConnect(self, ws):
@@ -28,4 +23,4 @@ class ChatRoom(GamePlugin):
     def publishGiStatus(self):
         # Publish number of clients connected to this room
         self.txQueue.put_nowait(InternalGiStatus(
-            [{"clients": len(self.ws)}], self.path))
+            [{"clients": self.conns.count()}], self.path))
