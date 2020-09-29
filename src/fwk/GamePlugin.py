@@ -115,7 +115,7 @@ class Plugin:
                 if not isinstance(qmsg, ClientRxMsg):
                     print("Unexpected message not handled:", qmsg)
                     continue
-                self.txQueue.put_nowait(ClientTxMsg("Bad message", qmsg.initiatorWs,
+                self.txQueue.put_nowait(ClientTxMsg("Bad message", {qmsg.initiatorWs},
                                                     initiatorWs=qmsg.initiatorWs))
 
 
