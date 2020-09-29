@@ -36,6 +36,7 @@ from fwk.MsgType import (
 )
 import fwk.LobbyPlugin
 import Chat.ChatLobbyPlugin
+import Dirty7.Dirty7Lobby
 
 
 async def rxClient(clientWs, path):
@@ -126,6 +127,7 @@ def main():
 
     registerGameClass(fwk.LobbyPlugin.plugin())
     registerGameClass(Chat.ChatLobbyPlugin.plugin())
+    registerGameClass(Dirty7.Dirty7Lobby.plugin())
 
     asyncio.get_event_loop().run_until_complete(wsServer)
     asyncio.get_event_loop().run_forever()

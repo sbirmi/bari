@@ -53,7 +53,6 @@ Server --> Client
    ["GAME-OVER", list of winning playerNames]
 
 
-
 # Internal state machine
 
 WAITING_FOR_PLAYERS (len(players) < numPlayers)

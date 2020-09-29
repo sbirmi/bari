@@ -43,7 +43,7 @@ class RoundParameters:
                  penaltyPoints,
                  stopPoints):
         self.msgSrc = None
-        self.roundNum = None
+        self.roundNum = 0
 
         if (not isinstance(ruleNames, (list, set)) or
                 len(ruleNames) != 1 or
@@ -84,6 +84,9 @@ class RoundParameters:
                          stopPoints=stopPoints)
         self.ruleEngine = SupportedRules[next(iter(ruleNames))]
 
+    def __getattr__(self, name):
+        return getattr(self.state, name)
+
     def setPostInitParams(self, conns, roundNum):
         assert not self.msgSrc
         self.roundNum = roundNum
@@ -96,6 +99,9 @@ class RoundParameters:
             raise InvalidDataException("Invalid round parameters type or length", jmsg)
 
         return RoundParameters(**dict(zip(RoundParameters.ctrArgs, jmsg)))
+
+    def toJmsg(self):
+        return [self.roundNum, dict(self.state)]
 
 
 class RoundScore(MsgSrc):
