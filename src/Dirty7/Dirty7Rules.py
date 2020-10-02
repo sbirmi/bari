@@ -4,6 +4,8 @@ data should be passed in to methods but
 not retained locally.
 """
 
+from Dirty7 import Dirty7Round
+
 class MoveProcessor:
     def processJmsg(self, rule, round_, jmsg):
         """Returns True if the message was processed,
@@ -26,6 +28,19 @@ class RuleEngine:
 
     def cardPoints(self, card):
         return min(card.rank, 10)
+
+    def makeRoundParameters(self, hostParams, roundNum):
+        roundParameters = Dirty7Round.RoundParameters(
+            [self.shortName],
+            hostParams.numPlayers,
+            hostParams.state.numDecks,
+            hostParams.state.numJokers,
+            hostParams.state.numCardsToStart,
+            hostParams.state.declareMaxPoints,
+            hostParams.state.penaltyPoints,
+            hostParams.state.stopPoints,
+            roundNum=roundNum)
+        return roundParameters
 
 #* ruleSet = subset from
 #     {"random",

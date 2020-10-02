@@ -7,9 +7,17 @@ from fwk.Msg import (
         ClientTxMsg,
         InternalGiStatus,
 )
+from fwk.Trace import (
+        Level,
+        trace,
+)
 from Dirty7.Dirty7Game import (
         GameState,
         Player,
+)
+from Dirty7.Dirty7Round import (
+        Round,
+        Turn,
 )
 
 validPlayerNameRe = re.compile("^[a-zA-Z0-9_]+$")
@@ -29,20 +37,39 @@ class Dirty7Room(GamePlugin):
         self.gameState = GameState.WAITING_FOR_PLAYERS
         self.playerByName = {}
         self.playerByWs = {}
+        self.rounds = []
+
+    def newRound(self):
+        roundNum = len(self.rounds) + 1
+        trace(Level.rnd, self.path, "starting round", roundNum)
+
+        # Get round parameters
+        roundParameters = self.hostParameters.roundParameters(roundNum)
+
+        round_ = Round(self.path, self.conns, roundParameters,
+                       self.playerByName, self.playerByWs)
+        self.rounds.append(round_)
+
+    def startGame(self):
+        trace(Level.game, self.path, "starting")
+        self.newRound()
 
     def processEvent(self, event):
+        trace(Level.game, "processEvent", event, "state=", self.gameState)
         if event == PLAYER_JOINED:
             # A new player has joined
             assert self.gameState == GameState.WAITING_FOR_PLAYERS
+
             if len(self.playerByName) == self.hostParameters.numPlayers:
                 self.processEvent(START_ROUND)
                 return
 
-            # Wait for more players
+            # Waiting for more players
             self.publishGiStatus()
 
         elif event == START_ROUND:
             self.gameState = GameState.ROUND_START
+            self.startGame()
 
             self.publishGiStatus()
 

@@ -27,6 +27,8 @@ Server --> Client
     numHiddenCards <int>,
     [faceUpCard1, faceUpCard2, ...]]
 
+   ["TURN-ORDER", roundNum <int>, [playerName1, playerName2, ...]]
+
 Client --> Server
    ["JOIN", playerName, passwd, (avatar)]
       ["JOIN-OKAY", playerName]
@@ -36,7 +38,7 @@ Server --> Client
    ["ROUND-START", roundNum <int>, turnOrder (list of player names), roundParameters]
 
 Server --> Client
-   ["TURN", playerName]
+   ["TURN", roundNum <int>, playerName]
 
 Client --> Server
    ["PLAY", {"dropCards": list of cards,

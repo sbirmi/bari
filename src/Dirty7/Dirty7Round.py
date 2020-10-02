@@ -2,26 +2,85 @@
 defined here.
 """
 
+import random
+
 from fwk.Common import Map
 
-from fwk.MsgSrc import MsgSrc
-from Dirty7.Card import CardGroupBase
+from fwk.MsgSrc import (
+        Jmai,
+        MsgSrc,
+)
+from Dirty7.Card import (
+        CLUBS,
+        DIAMONDS,
+        HEARTS,
+        SPADES,
+        JOKER,
+        Card,
+        CardGroupBase,
+)
 from Dirty7.Dirty7Rules import SupportedRules
 from Dirty7.Exceptions import InvalidDataException
 
-class Round:
-    def __init__(self, conns, ruleEngine, roundNum, roundParams,
-                 isRoundOver=False):
-        self.conns = conns
+class Turn(MsgSrc):
+    """Tracks turn order and whose turn it is"""
+    def __init__(self, conns, roundNum, playerNames):
+        MsgSrc.__init__(self, conns)
         self.roundNum = roundNum
-        self.roundParams = roundParams
-        self.ruleEngine = ruleEngine
-        self.roundScore = RoundScore(conns, roundNum)
-        self.playerRoundStatus = {}
-        self.playerNameInTurnOrder = []
+        self.playerNameInTurnOrder = playerNames
+        self.numPlayers = len(self.playerNameInTurnOrder)
+        random.shuffle(self.playerNameInTurnOrder)
         self.turnIdx = 0
-        self.tableCards = TableCards(conns, roundNum)
+
+        jmsg1 = ["TURN-ORDER", self.roundNum, self.playerNameInTurnOrder]
+        jmsg2 = ["TURN", self.roundNum, self.current()]
+        self.setMsgs([Jmai(jmsg1, None), Jmai(jmsg2, None)])
+
+    def next(self):
+        self.turnIdx = (self.turnIdx + 1) % self.numPlayers
+        jmsg = ["TURN", self.roundNum, self.current()]
+        self.replaceMsg(1, jmsg)
+
+    def current(self):
+        return self.playerNameInTurnOrder[self.turnIdx]
+
+
+class Round:
+    def __init__(self, path, conns, roundParams,
+                 playerByName,
+                 playerByWs,
+                 isRoundOver=False):
+        assert len(roundParams.state.ruleNames) == 1
+
+        self.path = path
+        self.conns = conns
+        self.roundParams = roundParams
+        self.playerByName = playerByName
+        self.playerByWs = playerByWs
         self.isRoundOver = isRoundOver
+
+        self.turn = Turn(conns, roundParams.roundNum, list(playerByName))
+        self.roundScore = RoundScore(conns, roundParams.roundNum,
+                                     {name: None for name in self.playerByName})
+
+        deckCards = roundParams.createStartingCards()
+
+        self.playerRoundStatus = {}
+        for name, player in self.playerByName.items():
+            handCards = [deckCards.pop() for _ in range(roundParams.numCardsToStart)]
+            self.playerRoundStatus[name] = PlayerRoundStatus(
+                conns,
+                roundParams.roundNum,
+                player,
+                handCards)
+
+        revealedCards = [deckCards.pop()]
+
+        self.tableCards = TableCards(conns, roundParams.roundNum,
+                                     deckCards=deckCards,
+                                     revealedCards=revealedCards)
+
+        self.rule = SupportedRules[next(iter(roundParams.state.ruleNames))]
 
 class RoundParameters:
     ctrArgs = ("ruleNames",
@@ -41,9 +100,10 @@ class RoundParameters:
                  numCardsToStart,
                  declareMaxPoints,
                  penaltyPoints,
-                 stopPoints):
+                 stopPoints,
+                 roundNum=0):
         self.msgSrc = None
-        self.roundNum = 0
+        self.roundNum = roundNum
 
         if (not isinstance(ruleNames, (list, set)) or
                 len(ruleNames) != 1 or
@@ -74,7 +134,7 @@ class RoundParameters:
         if not isinstance(stopPoints, int) or stopPoints < 0:
             raise InvalidDataException("Invalid stopPoints", stopPoints)
 
-        self.state = Map(ruleName=ruleNames,
+        self.state = Map(ruleNames=ruleNames,
                          numPlayers=numPlayers,
                          numDecks=numDecks,
                          numJokers=numJokers,
@@ -91,7 +151,7 @@ class RoundParameters:
         assert not self.msgSrc
         self.roundNum = roundNum
         self.msgSrc = MsgSrc(conns)
-        self.msgSrc.setMsgs([["ROUND-PARAMETERS", self.roundNum, dict(self.state)]])
+        self.msgSrc.setMsgs([Jmai(["ROUND-PARAMETERS", self.roundNum, dict(self.state)], None)])
 
     @staticmethod
     def fromJmsg(jmsg):
@@ -103,6 +163,19 @@ class RoundParameters:
     def toJmsg(self):
         return [self.roundNum, dict(self.state)]
 
+    def roundParameters(self, roundNum):
+        """Create round parameters from hostParameters"""
+        ruleName = random.choice(self.state.ruleNames)
+        return SupportedRules[ruleName].makeRoundParameters(self, roundNum)
+
+    def createStartingCards(self):
+        cards = []
+        for rank in range(1, 14):
+            cards.extend([Card(suit, rank) for suit in (CLUBS, DIAMONDS, HEARTS, SPADES)])
+        cards = cards * self.numDecks
+        cards.extend([Card(JOKER, 0) for _ in range(self.numJokers)])
+        random.shuffle(cards)
+        return cards
 
 class RoundScore(MsgSrc):
     """Tracks the score of all players at the end of the round"""
@@ -115,7 +188,7 @@ class RoundScore(MsgSrc):
     def setScores(self, scoreByPlayerName):
         self.scoreByPlayerName = scoreByPlayerName
         if self.scoreByPlayerName:
-            self.setMsgs([["ROUND-SCORE", self.roundNum, self.scoreByPlayerName]])
+            self.setMsgs([Jmai(["ROUND-SCORE", self.roundNum, self.scoreByPlayerName], None)])
 
 class TableCards(CardGroupBase):
     def __init__(self, conns, roundNum,
@@ -124,8 +197,8 @@ class TableCards(CardGroupBase):
                  hiddenCards=None):
         self.roundNum = roundNum
         self.deckCards = deckCards
-        self.hiddenCards = hiddenCards
         self.revealedCards = revealedCards
+        self.hiddenCards = hiddenCards or []
         CardGroupBase.__init__(self, conns, playerConns=None)
 
     def _connsJmsgs(self):
@@ -133,32 +206,33 @@ class TableCards(CardGroupBase):
                 self.hiddenCards is None):
             return None
 
-        return ["TABLE-CARDS", self.roundNum,
-                len(self.deckCards),
-                len(self.hiddenCards),
-                [card.toJmsg() for card in self.revealedCards]]
+        return [Jmai(["TABLE-CARDS", self.roundNum,
+                      len(self.deckCards), len(self.hiddenCards),
+                      [card.toJmsg() for card in self.revealedCards]], None)]
 
     def _playerConnsJmsgs(self):
         return None
 
 class PlayerRoundStatus:
-    def __init__(self, conns, player):
+    def __init__(self, conns, roundNum, player, handCards):
         self.conns = conns
+        self.roundNum = roundNum
         self.player = player
         self.hand = PlayerHand(self.conns,
                                self.player.playerConns,
-                               self.player.roundNum,
-                               self.player.name)
+                               roundNum,
+                               self.player.name,
+                               handCards)
 
 class PlayerHand(CardGroupBase):
-    def __init__(self, conns, playerConns, roundNum, playerName,
-                 cards=None,
+    def __init__(self, conns, playerConns, roundNum, playerName, cards,
                  isRoundOver=False):
         self.roundNum = roundNum
         self.playerName = playerName
-        self.cards = cards
+        self.cards = None
         self.isRoundOver = isRoundOver
         CardGroupBase.__init__(self, conns, playerConns)
+        self.setCards(cards)
 
     def setCards(self, cards):
         self.cards = cards
@@ -174,12 +248,12 @@ class PlayerHand(CardGroupBase):
             return None
 
         if self.isRoundOver:
-            return [["PLAYER-CARDS", self.roundNum,
-                     self.playerName, len(self.cards),
-                     [card.toJmsg() for card in self.cards]]]
+            return [Jmai(["PLAYER-CARDS", self.roundNum,
+                          self.playerName, len(self.cards),
+                          [card.toJmsg() for card in self.cards]], None)]
 
-        return [["PLAYER-CARDS", self.roundNum,
-                 self.playerName, len(self.cards)]]
+        return [Jmai(["PLAYER-CARDS", self.roundNum,
+                      self.playerName, len(self.cards)], None)]
 
     def _playerConnsJmsgs(self):
         if self.cards is None:
@@ -190,6 +264,6 @@ class PlayerHand(CardGroupBase):
             # hand to all in _setConnsData
             return None
 
-        return [["PLAYER-CARDS", self.roundNum,
-                 self.playerName, len(self.cards),
-                 [card.toJmsg() for card in self.cards]]]
+        return [Jmai(["PLAYER-CARDS", self.roundNum,
+                      self.playerName, len(self.cards),
+                      [card.toJmsg() for card in self.cards]], None)]
