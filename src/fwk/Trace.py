@@ -4,7 +4,7 @@ import os
 import sys
 
 class Level:
-    err = 0
+    error = 0
     warn = 1
     game = 2
     rnd = 3  # round
@@ -14,7 +14,7 @@ class Level:
     debug = 7
 
     strep = {
-        err: "ERR",
+        error: "ERR",
         warn: "WARN",
         game: "GAME",
         rnd: "ROUND",

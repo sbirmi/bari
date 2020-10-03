@@ -1,5 +1,6 @@
 """Dirty7 game instance"""
 
+import random
 import re
 
 from fwk.GamePlugin import GamePlugin
@@ -11,6 +12,9 @@ from fwk.Trace import (
         Level,
         trace,
 )
+from Dirty7.Card import (
+        Card,
+)
 from Dirty7.Dirty7Game import (
         GameState,
         Player,
@@ -19,17 +23,29 @@ from Dirty7.Dirty7Round import (
         Round,
         Turn,
 )
+from Dirty7.Exceptions import (
+        InvalidDataException,
+        InvalidPlayException,
+)
+from Dirty7.Events import (
+        AdvanceTurn,
+        GameBegin,
+        GameOver,
+        PlayerJoin,
+        StartRound,
+        StopRound,
+)
 
 validPlayerNameRe = re.compile("^[a-zA-Z0-9_]+$")
 validPasswdRe = re.compile("^[a-zA-Z0-9_]+$")
 
-PLAYER_JOINED = 1
-START_ROUND = 2
-ADVANCE_TURN = 3
-STOP_ROUND = 4
-STOP_GAME = 5
-
 class Dirty7Room(GamePlugin):
+    """
+    When a websocket has connected but hasn't joined:
+        playerByWs[ws] == None
+    As soon as the websocket sends a vailid JOIN message,
+        playerByWs[ws] == Player(..)
+    """
     def __init__(self, path, name, hostParameters):
         GamePlugin.__init__(self, path, name)
         self.hostParameters = hostParameters
@@ -38,52 +54,65 @@ class Dirty7Room(GamePlugin):
         self.playerByName = {}
         self.playerByWs = {}
         self.rounds = []
+        self.turn = None
 
-    def newRound(self):
-        roundNum = len(self.rounds) + 1
+    def newRound(self, startRound):
+        roundNum = startRound.roundNum
         trace(Level.rnd, self.path, "starting round", roundNum)
+
+        self.turn = Turn(self.conns, roundNum, startRound.turnOrderNames, startRound.turnIdx)
 
         # Get round parameters
         roundParameters = self.hostParameters.roundParameters(roundNum)
 
         round_ = Round(self.path, self.conns, roundParameters,
-                       self.playerByName, self.playerByWs)
+                       self.playerByName, self.turn)
         self.rounds.append(round_)
 
     def startGame(self):
         trace(Level.game, self.path, "starting")
-        self.newRound()
 
-    def processEvent(self, event):
-        trace(Level.game, "processEvent", event, "state=", self.gameState)
-        if event == PLAYER_JOINED:
+    def processEvent(self, event): # pylint: disable=too-many-return-statements
+        trace(Level.game, "processEvent", str(event), "in state", self.gameState)
+        if isinstance(event, PlayerJoin):
             # A new player has joined
             assert self.gameState == GameState.WAITING_FOR_PLAYERS
 
             if len(self.playerByName) == self.hostParameters.numPlayers:
-                self.processEvent(START_ROUND)
+                self.processEvent(GameBegin())
                 return
 
             # Waiting for more players
             self.publishGiStatus()
+            return
 
-        elif event == START_ROUND:
-            self.gameState = GameState.ROUND_START
+        if isinstance(event, GameBegin):
+            assert self.gameState == GameState.WAITING_FOR_PLAYERS
             self.startGame()
+            self.gameState = GameState.GAME_BEGIN
+            turnOrderNames = list(self.playerByName)
+            random.shuffle(turnOrderNames)
+            self.processEvent(StartRound(1, turnOrderNames, 0))
+            return
 
+        if isinstance(event, StartRound):
+            assert self.gameState in {GameState.GAME_BEGIN, GameState.ROUND_STOP}
+            self.gameState = GameState.ROUND_START
+            self.newRound(event)
+            self.gameState = GameState.PLAYER_TURN
             self.publishGiStatus()
+            return
 
-        elif event == ADVANCE_TURN:
-            pass
+        if isinstance(event, AdvanceTurn):
+            return
 
-        elif event == STOP_ROUND:
-            pass
+        if isinstance(event, StopRound):
+            return
 
-        elif event == STOP_GAME:
-            pass
+        if isinstance(event, GameOver):
+            return
 
-        else:
-            assert False
+        trace(Level.error, "Invalid event received", str(event))
 
     def processJoin(self, qmsg): # pylint: disable=too-many-return-statements
         """
@@ -124,7 +153,7 @@ class Dirty7Room(GamePlugin):
             self.playerByName[playerName] = player
             self.txQueue.put_nowait(ClientTxMsg(["JOIN-OKAY"], {ws}, initiatorWs=ws))
 
-            self.processEvent(PLAYER_JOINED)
+            self.processEvent(PlayerJoin(player))
             return True
 
         if playerName not in self.playerByName and self.gameState != GameState.WAITING_FOR_PLAYERS:
@@ -151,12 +180,112 @@ class Dirty7Room(GamePlugin):
 
         return True
 
+    def processPlay(self, qmsg): # pylint: disable=too-many-return-statements,too-many-branches
+        """
+        ["PLAY", {"dropCards": list of cards,
+                  "numDrawCards": int,
+                  "pickCards": list of cards}]
+        Should only be processed if:
+        1. game state is player turn
+        2. ws has joined
+        3. player[ws].name == turn.current()
+        """
+        ws = qmsg.initiatorWs
+
+        if self.gameState != GameState.PLAYER_TURN:
+            self.txQueue.put_nowait(ClientTxMsg(["PLAY-BAD", "Can't make moves now"],
+                                                {ws}, initiatorWs=ws))
+            return True
+
+        if self.playerByWs[ws] is None:
+            self.txQueue.put_nowait(ClientTxMsg(["PLAY-BAD", "You must join the game first"],
+                                                {ws}, initiatorWs=ws))
+            return True
+
+        if self.playerByWs[ws].name != self.turn.current():
+            self.txQueue.put_nowait(ClientTxMsg(["PLAY-BAD", "It is not your turn"],
+                                                {ws}, initiatorWs=ws))
+            return True
+
+
+
+        if len(qmsg.jmsg) != 2:
+            self.txQueue.put_nowait(ClientTxMsg(["PLAY-BAD", "Invalid message length"],
+                                                {ws}, initiatorWs=ws))
+            return True
+
+        playDesc = qmsg.jmsg[1]
+        if not isinstance(playDesc, dict):
+            self.txQueue.put_nowait(ClientTxMsg(["PLAY-BAD", "Invalid move description"],
+                                                {ws}, initiatorWs=ws))
+            return True
+
+        # dropCards
+        dropCards = playDesc.pop("dropCards", [])
+        if not isinstance(dropCards, list):
+            self.txQueue.put_nowait(ClientTxMsg(["PLAY-BAD", "Invalid cards being dropped",
+                                                 dropCards], {ws}, initiatorWs=ws))
+            return True
+
+        try:
+            dropCards = [Card.fromJmsg(cd) for cd in dropCards]
+        except InvalidDataException as exc:
+            self.txQueue.put_nowait(ClientTxMsg(["PLAY-BAD"] + exc.toJmsg(),
+                                                {ws}, initiatorWs=ws))
+            return True
+
+        # numDrawCards
+        numDrawCards = playDesc.pop("numDrawCards", 0)
+        if not isinstance(numDrawCards, int):
+            self.txQueue.put_nowait(ClientTxMsg(["PLAY-BAD", "Drawing invalid number of cards",
+                                                 numDrawCards], {ws}, initiatorWs=ws))
+            return True
+
+        # pickCards
+        pickCards = playDesc.pop("pickCards", [])
+        if not isinstance(pickCards, list):
+            self.txQueue.put_nowait(ClientTxMsg(["PLAY-BAD", "Invalid cards being drawn",
+                                                 pickCards], {ws}, initiatorWs=ws))
+            return True
+
+        try:
+            pickCards = [Card.fromJmsg(cd) for cd in pickCards]
+        except InvalidDataException as exc:
+            self.txQueue.put_nowait(ClientTxMsg(["PLAY-BAD"] + exc.toJmsg(),
+                                                {ws}, initiatorWs=ws))
+            return True
+
+        # If item remain in play-description, complain
+        if playDesc:
+            self.txQueue.put_nowait(ClientTxMsg(["PLAY-BAD", "Unrecognized play description",
+                                                 playDesc], {ws}, initiatorWs=ws))
+            return True
+
+        currRound = self.rounds[-1]
+        try:
+            event = currRound.rule.processPlay(currRound, self.playerByWs[ws],
+                                               dropCards, numDrawCards, pickCards)
+        except InvalidPlayException as exc:
+            self.txQueue.put_nowait(ClientTxMsg(["PLAY-BAD"] + exc.toJmsg(), {ws}, initiatorWs=ws))
+        else:
+            if event:
+                self.processEvent(event)
+            else:
+                self.txQueue.put_nowait(ClientTxMsg(["PLAY-BAD", "Invalid play"],
+                                                    {ws}, initiatorWs=ws))
+
+        return True
+
     def processMsg(self, qmsg):
         if super(Dirty7Room, self).processMsg(qmsg):
             return True
 
         if qmsg.jmsg[0] == "JOIN":
             return self.processJoin(qmsg)
+
+        if qmsg.jmsg[0] == "PLAY":
+            return self.processPlay(qmsg)
+
         return False
 
     def postQueueSetup(self):

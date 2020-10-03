@@ -24,13 +24,12 @@ from Dirty7.Exceptions import InvalidDataException
 
 class Turn(MsgSrc):
     """Tracks turn order and whose turn it is"""
-    def __init__(self, conns, roundNum, playerNames):
+    def __init__(self, conns, roundNum, playerNameInTurnOrder, turnIdx):
         MsgSrc.__init__(self, conns)
         self.roundNum = roundNum
-        self.playerNameInTurnOrder = playerNames
+        self.playerNameInTurnOrder = playerNameInTurnOrder
         self.numPlayers = len(self.playerNameInTurnOrder)
-        random.shuffle(self.playerNameInTurnOrder)
-        self.turnIdx = 0
+        self.turnIdx = turnIdx
 
         jmsg1 = ["TURN-ORDER", self.roundNum, self.playerNameInTurnOrder]
         jmsg2 = ["TURN", self.roundNum, self.current()]
@@ -48,7 +47,7 @@ class Turn(MsgSrc):
 class Round:
     def __init__(self, path, conns, roundParams,
                  playerByName,
-                 playerByWs,
+                 turn,
                  isRoundOver=False):
         assert len(roundParams.state.ruleNames) == 1
 
@@ -56,10 +55,9 @@ class Round:
         self.conns = conns
         self.roundParams = roundParams
         self.playerByName = playerByName
-        self.playerByWs = playerByWs
+        self.turn = turn
         self.isRoundOver = isRoundOver
 
-        self.turn = Turn(conns, roundParams.roundNum, list(playerByName))
         self.roundScore = RoundScore(conns, roundParams.roundNum,
                                      {name: None for name in self.playerByName})
 

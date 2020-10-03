@@ -9,3 +9,12 @@ class InvalidDataException(Exception):
 
     def toJmsg(self):
         return [self.explanation, str(self.data)]
+
+class InvalidPlayException(Exception):
+    def __init__(self, data):
+        """data : str"""
+        Exception.__init__(self, data)
+        self.data = data
+
+    def toJmsg(self):
+        return [self.data]

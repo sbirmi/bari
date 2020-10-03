@@ -27,15 +27,12 @@ Server --> Client
     numHiddenCards <int>,
     [faceUpCard1, faceUpCard2, ...]]
 
-   ["TURN-ORDER", roundNum <int>, [playerName1, playerName2, ...]]
+   ["TURN-ORDER", roundNum <int>, [playerName1, playerName2, ...]] << only for active round
 
 Client --> Server
    ["JOIN", playerName, passwd, (avatar)]
       ["JOIN-OKAY", playerName]
       ["JOIN-BAD", "reason", (opt) bad-data]
-
-Server --> Client
-   ["ROUND-START", roundNum <int>, turnOrder (list of player names), roundParameters]
 
 Server --> Client
    ["TURN", roundNum <int>, playerName]
@@ -93,7 +90,6 @@ GAME_OVER
 * round (Dirty7Round)
 
 ## RuleEngine
-* rxQueue
 * moveProcessorList (list of move validation and enactors)
 * conns
 * round (Dirty7Round)

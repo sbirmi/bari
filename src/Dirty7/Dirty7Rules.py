@@ -7,9 +7,11 @@ not retained locally.
 from Dirty7 import Dirty7Round
 
 class MoveProcessor:
-    def processJmsg(self, rule, round_, jmsg):
-        """Returns True if the message was processed,
-        else returns False
+    def processPlay(self, round_, player, dropCards, numDrawCards, pickCards):
+        """Returns None if the play message was not processed.
+        If it is handled, return an Event type.
+
+        If the move is invalid, return InvalidPlayException.
         """
         raise NotImplementedError
 
@@ -41,6 +43,23 @@ class RuleEngine:
             hostParams.state.stopPoints,
             roundNum=roundNum)
         return roundParameters
+
+    def processPlay(self, round_, player, dropCards, numDrawCards, pickCards):
+        """On valid play, make the change thru round_ and have that generate the
+        required notification messages.
+        If the move is invalid, raise InvalidPlayException(<str>)
+
+        Returns : EVENT (such as AdvanceTurn)
+        """
+        for moveProcessor in self.moveProcessorList:
+            result = moveProcessor.processPlay(round_, player,
+                                               dropCards,
+                                               numDrawCards,
+                                               pickCards)
+            if result:
+                return result
+
+        return None
 
 #* ruleSet = subset from
 #     {"random",
