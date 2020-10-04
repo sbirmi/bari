@@ -286,7 +286,10 @@ class Dirty7Room(GamePlugin):
                                                 {ws}, initiatorWs=ws))
         else:
             jmsg = ["UPDATE", currRound.roundParams.roundNum,
-                    {"PLAY": [self.playerByWs[ws].name, dropCards, numDrawCards, pickCards] +
+                    {"PLAY": [self.playerByWs[ws].name,
+                              [cd.toJmsg() for cd in dropCards],
+                              numDrawCards,
+                              [cd.toJmsg() for cd in pickCards]] +
                              event.toJmsg()}]
             self.broadcast(jmsg)
             self.processEvent(event)
