@@ -26,6 +26,18 @@ class Card:
         self.suit = suit
         self.rank = rank
 
+    def __eq__(self, other):
+        return str(self) == str(other)
+
+    def __hash__(self):
+        return hash(str(self))
+
+
+    def __str__(self):
+        if self.suit == "JOKER":
+            return "JOKER"
+        return "{}{}".format(self.rank, self.suit)
+
     @staticmethod
     def fromJmsg(jmsg):
         if not isinstance(jmsg, list) or len(jmsg) != 2:
@@ -61,3 +73,16 @@ class CardGroupBase:
 
     def _playerConnsJmsgs(self):
         raise NotImplementedError
+
+    @staticmethod
+    def contains(cards1, cards2):
+        """Returns cards1 contains cards2"""
+        cards1_ = cards1[:]
+        for card in cards2:
+            try:
+                idx = cards1_.index(card)
+            except ValueError:
+                return False
+            cards1_.pop(idx)
+
+        return True
