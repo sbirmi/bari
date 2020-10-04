@@ -222,7 +222,7 @@ class TableCards(CardGroupBase):
     def delta(self, dropCards, pickCards, numDrawCards):
         assert numDrawCards <= self.deckCardCount()
 
-        playerGainCards = dropCards[:]
+        playerGainCards = pickCards[:]
         # Remove cards from the deck
         for _ in range(numDrawCards):
             playerGainCards.append(self.deckCards.pop(0))
