@@ -72,7 +72,7 @@ class Dirty7Room(GamePlugin):
     def startGame(self):
         trace(Level.game, self.path, "starting")
 
-    def processEvent(self, event): # pylint: disable=too-many-return-statements
+    def processEvent(self, event):
         trace(Level.game, "processEvent", str(event), "in state", self.gameState)
         if isinstance(event, PlayerJoin):
             # A new player has joined
@@ -104,6 +104,8 @@ class Dirty7Room(GamePlugin):
             return
 
         if isinstance(event, AdvanceTurn):
+            self.turn.advance(event)
+            self.publishGiStatus()
             return
 
         if isinstance(event, StopRound):
@@ -114,7 +116,7 @@ class Dirty7Room(GamePlugin):
 
         trace(Level.error, "Invalid event received", str(event))
 
-    def processJoin(self, qmsg): # pylint: disable=too-many-return-statements
+    def processJoin(self, qmsg):
         """
         ["JOIN", playerName, passwd, (avatar)]
         """
@@ -180,7 +182,7 @@ class Dirty7Room(GamePlugin):
 
         return True
 
-    def processPlay(self, qmsg): # pylint: disable=too-many-return-statements,too-many-branches
+    def processPlay(self, qmsg):
         """
         ["PLAY", {"dropCards": list of cards,
                   "numDrawCards": int,
@@ -219,6 +221,7 @@ class Dirty7Room(GamePlugin):
             self.txQueue.put_nowait(ClientTxMsg(["PLAY-BAD", "Invalid move description"],
                                                 {ws}, initiatorWs=ws))
             return True
+        playDesc = dict(playDesc)
 
         # dropCards
         dropCards = playDesc.pop("dropCards", [])
@@ -262,17 +265,31 @@ class Dirty7Room(GamePlugin):
             return True
 
         currRound = self.rounds[-1]
-        try:
-            event = currRound.rule.processPlay(currRound, self.playerByWs[ws],
-                                               dropCards, numDrawCards, pickCards)
-        except InvalidPlayException as exc:
-            self.txQueue.put_nowait(ClientTxMsg(["PLAY-BAD"] + exc.toJmsg(), {ws}, initiatorWs=ws))
+
+        # If the deck doesn't have numDrawCards
+        if currRound.tableCards.deckCardCount() < numDrawCards:
+            self.txQueue.put_nowait(ClientTxMsg(["PLAY-BAD", "Drawing invalid number of cards",
+                                                 numDrawCards], {ws}, initiatorWs=ws))
+            return None
+
+        # pickCards should be in revealedCards
+        if not currRound.tableCards.revealedCardsContains(pickCards):
+            self.txQueue.put_nowait(ClientTxMsg(["PLAY-BAD", "Picking cards not available",
+                                                 pickCards], {ws}, initiatorWs=ws))
+            return True
+
+        event = currRound.rule.processPlay(currRound, self.playerByWs[ws],
+                                           dropCards, numDrawCards, pickCards)
+
+        if not event:
+            self.txQueue.put_nowait(ClientTxMsg(["PLAY-BAD", "Invalid play"],
+                                                {ws}, initiatorWs=ws))
         else:
-            if event:
-                self.processEvent(event)
-            else:
-                self.txQueue.put_nowait(ClientTxMsg(["PLAY-BAD", "Invalid play"],
-                                                    {ws}, initiatorWs=ws))
+            jmsg = ["UPDATE", currRound.roundParams.roundNum,
+                    {"PLAY": [self.playerByWs[ws].name, dropCards, numDrawCards, pickCards] +
+                             event.toJmsg()}]
+            self.broadcast(jmsg)
+            self.processEvent(event)
 
         return True
 

@@ -5,10 +5,13 @@ defined here.
 import random
 
 from fwk.Common import Map
-
 from fwk.MsgSrc import (
         Jmai,
         MsgSrc,
+)
+from fwk.Trace import (
+        Level,
+        trace,
 )
 from Dirty7.Card import (
         CLUBS,
@@ -21,6 +24,12 @@ from Dirty7.Card import (
 )
 from Dirty7.Dirty7Rules import SupportedRules
 from Dirty7.Exceptions import InvalidDataException
+
+def removeCards(cards1, cards2):
+    """returns cards1 - cards2"""
+    for card in cards2:
+        idx = cards1.index(card)
+        cards1.pop(idx)
 
 class Turn(MsgSrc):
     """Tracks turn order and whose turn it is"""
@@ -35,9 +44,9 @@ class Turn(MsgSrc):
         jmsg2 = ["TURN", self.roundNum, self.current()]
         self.setMsgs([Jmai(jmsg1, None), Jmai(jmsg2, None)])
 
-    def next(self):
-        self.turnIdx = (self.turnIdx + 1) % self.numPlayers
-        jmsg = ["TURN", self.roundNum, self.current()]
+    def advance(self, advanceTurn):
+        self.turnIdx = (self.turnIdx + advanceTurn.turnStep) % self.numPlayers
+        jmsg = Jmai(["TURN", self.roundNum, self.current()], initiatorWs=None)
         self.replaceMsg(1, jmsg)
 
     def current(self):
@@ -189,6 +198,11 @@ class RoundScore(MsgSrc):
             self.setMsgs([Jmai(["ROUND-SCORE", self.roundNum, self.scoreByPlayerName], None)])
 
 class TableCards(CardGroupBase):
+    """Manages the cards on the table:
+    1. the Deck
+    2. the revealed cards
+    3. the hidden cards (face-up cards that are hidden)
+    """
     def __init__(self, conns, roundNum,
                  deckCards=None,
                  revealedCards=None,
@@ -198,6 +212,40 @@ class TableCards(CardGroupBase):
         self.revealedCards = revealedCards
         self.hiddenCards = hiddenCards or []
         CardGroupBase.__init__(self, conns, playerConns=None)
+
+    def revealedCardsContains(self, cards):
+        return CardGroupBase.contains(self.revealedCards, cards)
+
+    def deckCardCount(self):
+        return len(self.deckCards)
+
+    def delta(self, dropCards, pickCards, numDrawCards):
+        assert numDrawCards <= self.deckCardCount()
+
+        playerGainCards = dropCards[:]
+        # Remove cards from the deck
+        for _ in range(numDrawCards):
+            playerGainCards.append(self.deckCards.pop(0))
+
+        # Remove picked cards from revealed cards
+        removeCards(self.revealedCards, pickCards) # revealedCards is updated in place
+
+        # Push remaining revealed cards to the hiddenCards
+        self.hiddenCards.extend(self.revealedCards)
+
+        # revealedCards <-- dropCards
+        self.revealedCards = dropCards
+
+        # Shuffle deck if needed
+        if self.deckCardCount() == 0:
+            trace(Level.info, self.roundNum, "rebuild deck")
+            # Take all hidden cards
+            self.deckCards = self.hiddenCards
+            self.hiddenCards = []
+            random.shuffle(self.deckCards)
+
+        self.refresh()
+        return playerGainCards
 
     def _connsJmsgs(self):
         if (self.deckCards is None or self.revealedCards is None or
@@ -236,9 +284,17 @@ class PlayerHand(CardGroupBase):
         self.cards = cards
         self.refresh()
 
+    def contains(self, cards): # pylint: disable=arguments-differ
+        return CardGroupBase.contains(self.cards, cards)
+
     def roundOver(self):
         """Reveals the hand to all players"""
         self.isRoundOver = True
+        self.refresh()
+
+    def delta(self, dropCards, gainCards):
+        removeCards(self.cards, dropCards)
+        self.cards += gainCards
         self.refresh()
 
     def _connsJmsgs(self):

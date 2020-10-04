@@ -8,7 +8,7 @@ class Level:
     warn = 1
     game = 2
     rnd = 3  # round
-    turn = 4
+    play = 4
     info = 5
     msg = 6
     debug = 7
@@ -18,7 +18,7 @@ class Level:
         warn: "WARN",
         game: "GAME",
         rnd: "ROUND",
-        turn: "TURN",
+        play: "PLAY",
         info: "INFO",
         msg: "MSG",
         debug: "DEBUG",
