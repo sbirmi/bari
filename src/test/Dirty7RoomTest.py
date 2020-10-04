@@ -89,16 +89,12 @@ class Dirty7RoomTest(unittest.TestCase, MsgTestLib):
                                                         ['C', 4]]], {2}),
             ], anyOrder=True)
 
-    def testDirty7Room(self):
+    def testDirty7RoomBadMoves(self):
         env = self.setUpDirty7Room()
         for msg in (ClientRxMsg(["PLAY", {"dropCards": [['H', 3]]}], initiatorWs=env.ws1),
                     ClientRxMsg(["PLAY", {"dropCards": [['H', 3], ['H', 3]],
                                           "numDrawCards": 0,
                                           "pickCards": [["H", 2], ["S", 4]]}],
-                                initiatorWs=env.ws2),
-                    ClientRxMsg(["PLAY", {"dropCards": [['H', 3]],
-                                          "numDrawCards": 1,
-                                          "pickCards": []}],
                                 initiatorWs=env.ws2),
                    ):
             env.room.processMsg(msg)
@@ -139,6 +135,48 @@ class Dirty7RoomTest(unittest.TestCase, MsgTestLib):
                                            ClientTxMsg(['PLAY-BAD', 'Picking cards not available',
                                                         [['H', 2], ['S', 4]]],
                                                        {env.ws2}, initiatorWs=env.ws2),
+                                          ])
+
+    def testDirty7Room(self):
+        env = self.setUpDirty7Room()
+        for msg in (ClientRxMsg(["PLAY", {"dropCards": [['H', 3]],
+                                          "numDrawCards": 1,
+                                          "pickCards": []}],
+                                initiatorWs=env.ws2),
+                   ):
+            env.room.processMsg(msg)
+
+        self.assertGiTxQueueMsgs(env.txq, [InternalGiStatus([{'gameState': 1}, 0,
+                                                             env.hostParameters.state], "dirty7:1"),
+                                           InternalGiStatus([{'gameState': 1}, 0,
+                                                             env.hostParameters.state], "dirty7:1"),
+                                           ClientTxMsg(["JOIN-OKAY"], {env.ws1},
+                                                       initiatorWs=env.ws1),
+                                           InternalGiStatus([{'gameState': 1}, 0,
+                                                             env.hostParameters.state], "dirty7:1"),
+                                           ClientTxMsg(["JOIN-OKAY"], {env.ws2},
+                                                       initiatorWs=env.ws2),
+                                           ClientTxMsg(['TURN-ORDER', 1, ['plyr2', 'plyr1']],
+                                                       {env.ws1, env.ws2}),
+                                           ClientTxMsg(['TURN', 1, 'plyr2'], {env.ws1, env.ws2}),
+                                           ClientTxMsg(['ROUND-SCORE', 1,
+                                                        {'plyr1': None, 'plyr2': None}],
+                                                       {env.ws1, env.ws2}),
+                                           ClientTxMsg(['PLAYER-CARDS', 1, 'plyr1', 7],
+                                                       {env.ws1, env.ws2}),
+                                           ClientTxMsg(['PLAYER-CARDS', 1, 'plyr1', 7,
+                                                        [['C', 9], ['S', 4], ['S', 3], ['D', 12],
+                                                         ['D', 2], ['C', 3], ['S', 8]]], {env.ws1}),
+                                           ClientTxMsg(['PLAYER-CARDS', 1, 'plyr2', 7],
+                                                       {env.ws1, env.ws2}),
+                                           ClientTxMsg(['PLAYER-CARDS', 1, 'plyr2', 7,
+                                                        [['C', 13], ['H', 7], ['C', 4], ['H', 3],
+                                                         ['S', 1], ['D', 13], ['S', 1]]],
+                                                       {env.ws2}),
+                                           ClientTxMsg(['TABLE-CARDS', 1, 90, 0, [['D', 7]]],
+                                                       {env.ws1, env.ws2}),
+                                           InternalGiStatus([{'gameState': 4}, 0,
+                                                             env.hostParameters.state], "dirty7:1"),
                                            ClientTxMsg(['TABLE-CARDS', 1, 89, 1, [['H', 3]]],
                                                        {env.ws1, env.ws2}),
                                            ClientTxMsg(['PLAYER-CARDS', 1, 'plyr2', 8],
@@ -155,7 +193,6 @@ class Dirty7RoomTest(unittest.TestCase, MsgTestLib):
                                            InternalGiStatus([{'gameState': 4}, 0,
                                                              env.hostParameters.state], "dirty7:1"),
                                           ])
-
 
     def testDirty7RoomConnectThenJoin(self):
         rxq = asyncio.Queue()
