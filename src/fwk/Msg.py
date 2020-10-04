@@ -43,8 +43,8 @@ class ClientTxMsg(MsgBase):
 
     def __str__(self):
         # pylint: disable=bad-super-call
-        return super(self.__class__, self).__str__() + " jmsg=" + str(self.jmsg) + \
-                " toWss=" + str(self.toWss)
+        return super(self.__class__, self).__str__() + " toWss=" + str(self.toWss) + \
+                " jmsg=" + str(self.jmsg)
 
 class InternalRegisterGi(MsgBase):
     def __init__(self, gi, initiatorWs=None):
