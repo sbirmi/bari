@@ -1,6 +1,10 @@
 # Dirty7
 
-TODO Add version #
+# TODO
+1. Add version #
+2. Review each trace statement (add self.path)
+3. Add more trace statements
+4. Add more btests
 
 ## Rules
 
@@ -44,6 +48,11 @@ Client --> Server
 
       ["PLAY-OKAY"]
       ["PLAY-BAD", "reason", (opt) bad-data]
+
+Server --> All
+      ["UPDATE", roundNum,
+       {"PLAY": [playerName, pickedCards, numDrawCards, AdvanceMade]}]
+
 
 Server --> Client
    ["ROUND-OVER", roundNum <int>, scoreByPlayerName]
