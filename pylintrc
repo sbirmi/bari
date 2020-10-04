@@ -139,6 +139,8 @@ disable=print-statement,
         deprecated-sys-function,
         exception-escape,
         comprehension-escape,
+        too-many-return-statements, # sbirmiwal
+        too-many-branches, # sbirmiwal
         invalid-name,  # sbirmiwal custom
         unused-import,
         missing-module-docstring,
