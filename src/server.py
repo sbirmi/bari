@@ -7,6 +7,7 @@ versa.
 """
 
 import asyncio
+import itertools
 import json
 import websockets
 
@@ -35,9 +36,22 @@ from fwk.MsgType import (
         MTYPE_ERROR,
 )
 import fwk.LobbyPlugin
+from fwk.Trace import (
+        Level,
+        trace,
+)
 import Chat.ChatLobbyPlugin
 import Dirty7.Dirty7Lobby
 
+
+WsIdAllocator = itertools.count()
+def nextWsId():
+    return next(WsIdAllocator)
+
+def wsSetBariName(ws):
+    assert not hasattr(ws, "bari_name")
+    wsId = nextWsId()
+    ws.bari_name = "#{}/{}:{}" .format(wsId, ws.remote_address[0], ws.remote_address[1])
 
 async def rxClient(clientWs, path):
     """
@@ -45,6 +59,7 @@ async def rxClient(clientWs, path):
     the server.
     """
     path = path.strip("/")
+    wsSetBariName(clientWs)
 
     # GxRxQueue + task must exist if the path is valid in this check
     if giByPath(path) is None:
@@ -112,7 +127,11 @@ async def giTxQueue(queue):
             giRxMsg(LOBBY_PATH, qmsg)
             continue
 
-        msg = json.dumps(qmsg.jmsg)
+        try:
+            msg = json.dumps(qmsg.jmsg)
+        except TypeError as exc:
+            trace(Level.error, "Error serializing as JSON:", str(qmsg.jmsg), str(exc))
+            continue
 
         assert isinstance(qmsg, ClientTxMsg)
         for toWs in qmsg.toWss:

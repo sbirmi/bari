@@ -4,6 +4,11 @@
 import asyncio
 from collections import defaultdict
 
+from fwk.Trace import (
+        Level,
+        trace,
+)
+
 
 # -------------------------------------
 # Queue + task for sending messages to
@@ -26,7 +31,7 @@ def clientTxQueueRemove(ws):
     del ClientTxTaskByWs[ws]
 
     # Client disconnected
-    print("Client", ws, "disconnected")
+    trace(Level.conn, "Client", ws, "disconnected")
 
 async def clientTxTask(queue, clientWs):
     """
@@ -35,7 +40,7 @@ async def clientTxTask(queue, clientWs):
     """
     while True:
         msg = await queue.get()
-        print("clientTxTask: sending", "'%s'" % msg, "to", clientWs)
+        trace(Level.msg, "clientTxTask: sending", "'%s'" % msg, "to", clientWs)
         await clientWs.send(msg)
         queue.task_done()
 
@@ -63,11 +68,11 @@ WsByPath = defaultdict(set)
 
 def wsPathAdd(ws, path): # pylint: disable=missing-function-docstring
     WsByPath[path].add(ws)
-    print("WsByPath: add", ws, "path", path)
+    trace(Level.conn, "WsByPath: add", ws, "path", path)
 
 def wsPathRemove(ws, path): # pylint: disable=missing-function-docstring
     WsByPath[path].remove(ws)
-    print("WsByPath: remove", ws, "path", path)
+    trace(Level.conn, "WsByPath: remove", ws, "path", path)
 
 def socketsByPath(path): # pylint: disable=missing-function-docstring
     return WsByPath.get(path, None)
@@ -85,11 +90,11 @@ def giByPath(path):
 async def clientTxMsg(msg, toWs):
     """Helper to queue a message to be sent to 'toWs'"""
     if toWs not in ClientTxQueueByWs:
-        print("clientTxMsg: unable to queue",
+        trace(Level.error, "clientTxMsg: unable to queue",
               "'%s'" % msg,
               "for sending to client", toWs)
         return
-    print("clientTxMsg:", toWs, "'%s'" % msg)
+    trace(Level.debug, "clientTxMsg:", toWs, "'%s'" % msg)
     ClientTxQueueByWs[toWs].put_nowait(msg)
 
 # -------------------------------------
@@ -98,7 +103,7 @@ async def clientTxMsg(msg, toWs):
 
 def registerGameClass(gi):
     """Register game instance with the main loop"""
-    print("Registering {} ({})".format(gi.name, gi.path))
+    trace(Level.game, "Registering {} ({})".format(gi.name, gi.path))
 
     assert gi.path not in GiByPath
     GiByPath[gi.path] = gi

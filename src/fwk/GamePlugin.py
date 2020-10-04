@@ -16,6 +16,10 @@ from fwk.Msg import (
         ClientRxMsg,
         ClientTxMsg,
 )
+from fwk.Trace import (
+        Level,
+        trace,
+)
 
 
 class Plugin:
@@ -104,16 +108,16 @@ class Plugin:
     async def worker(self):
         """The worker task for a plugin. All messages should be processed.
         Any unhandled message returns a bad message to the sender"""
-        print("{}.worker() ready".format(self.path))
+        trace(Level.game, "{}.worker() ready".format(self.path))
         while True:
             qmsg = await self.rxQueue.get()
             self.rxQueue.task_done()
-            print("{}.worker() received".format(self.path), qmsg)
+            trace(Level.msg, self.path, "received", str(qmsg))
 
             processed = self.processMsg(qmsg)
             if not processed:
                 if not isinstance(qmsg, ClientRxMsg):
-                    print("Unexpected message not handled:", qmsg)
+                    trace(Level.error, "Unexpected message not handled:", str(qmsg))
                     continue
                 self.txQueue.put_nowait(ClientTxMsg("Bad message", {qmsg.initiatorWs},
                                                     initiatorWs=qmsg.initiatorWs))
