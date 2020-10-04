@@ -49,6 +49,8 @@ Client --> Server
       ["PLAY-OKAY"]
       ["PLAY-BAD", "reason", (opt) bad-data]
 
+   ["DECLARE"]
+
 Server --> All
       ["UPDATE", roundNum,
        {"PLAY": [playerName, pickedCards, numDrawCards, AdvanceMade]}]

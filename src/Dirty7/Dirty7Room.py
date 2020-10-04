@@ -275,7 +275,8 @@ class Dirty7Room(GamePlugin):
         # pickCards should be in revealedCards
         if not currRound.tableCards.revealedCardsContains(pickCards):
             self.txQueue.put_nowait(ClientTxMsg(["PLAY-BAD", "Picking cards not available",
-                                                 pickCards], {ws}, initiatorWs=ws))
+                                                 [cd.toJmsg() for cd in pickCards]], {ws},
+                                                initiatorWs=ws))
             return True
 
         event = currRound.rule.processPlay(currRound, self.playerByWs[ws],
