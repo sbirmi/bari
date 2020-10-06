@@ -113,9 +113,16 @@ class Dirty7RoomTest(unittest.TestCase, MsgTestLib):
         env.room.processMsg(ClientRxMsg(["DECLARE"], initiatorWs=turnWs))
         self.assertGiTxQueueMsgs(env.txq, [ClientTxMsg(['PLAYER-CARDS', 1, 'plyr2', 1],
                                                        {env.ws1, env.ws2}),
+                                           ClientTxMsg(['PLAYER-CARDS', 1, 'plyr1', 7,
+                                                        [['C', 9], ['S', 4], ['S', 3], ['D', 12],
+                                                         ['D', 2], ['C', 3], ['S', 8]]],
+                                                       {env.ws1, env.ws2}),
                                            ClientTxMsg(['PLAYER-CARDS', 1, 'plyr2', 1,
                                                         [['S', 7]]],
                                                        {env.ws2}),
+                                           ClientTxMsg(['PLAYER-CARDS', 1, 'plyr2', 1,
+                                                        [['S', 7]]],
+                                                       {env.ws1, env.ws2}),
                                            ClientTxMsg(['UPDATE', 1, {'DECLARE': ['plyr2', 7]}],
                                                        {env.ws1, env.ws2}),
                                            ClientTxMsg(['ROUND-SCORE', 1,
@@ -144,7 +151,7 @@ class Dirty7RoomTest(unittest.TestCase, MsgTestLib):
                                                        {env.ws1, env.ws2}),
                                            InternalGiStatus([{'gameState': 4}, 0,
                                                              env.hostParameters.state], "dirty7:1"),
-                                          ])
+                                          ], anyOrder=True)
 
         # Add a new player (as spectator) and see what messages are created
         ws10 = 10
@@ -154,11 +161,7 @@ class Dirty7RoomTest(unittest.TestCase, MsgTestLib):
                                               {ws10}),
                                   ClientTxMsg(['PLAYER-CARDS', 2, 'plyr1', 7],
                                               {ws10}),
-                                  ClientTxMsg(['PLAYER-CARDS', 1, 'plyr2', 1],
-                                              {ws10}),
                                   ClientTxMsg(['ROUND-SCORE', 1, {'plyr1': 39, 'plyr2': 0}],
-                                              {ws10}),
-                                  ClientTxMsg(['PLAYER-CARDS', 1, 'plyr1', 7],
                                               {ws10}),
                                   ClientTxMsg(['TABLE-CARDS', 2, 90, 0, [['H', 4]]],
                                               {ws10}),
@@ -172,6 +175,13 @@ class Dirty7RoomTest(unittest.TestCase, MsgTestLib):
                                               {ws10}),
                                   InternalGiStatus([{'gameState': 4}, 0,
                                                     env.hostParameters.state], "dirty7:1"),
+                                  ClientTxMsg(['PLAYER-CARDS', 1, 'plyr2', 1,
+                                               [['S', 7]]],
+                                              {ws10}),
+                                  ClientTxMsg(['PLAYER-CARDS', 1, 'plyr1', 7,
+                                               [['C', 9], ['S', 4], ['S', 3], ['D', 12],
+                                                ['D', 2], ['C', 3], ['S', 8]]],
+                                              {ws10}),
                                  ], anyOrder=True)
 
         # Have the spectator join and see what messages are created

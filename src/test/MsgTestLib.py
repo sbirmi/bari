@@ -44,7 +44,7 @@ class MsgTestLib:
             i += 1
 
         assert not expectedMsgs, """txq drained, some expected messages not found:
-{}""".format("\n".join(expectedMsgs))
+{}""".format("\n".join(str(msg) for msg in expectedMsgs))
 
     def drainGiTxQueue(self, txq, count=None):
         """Drain the game instance TX queue of messages"""

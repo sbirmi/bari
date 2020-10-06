@@ -104,6 +104,8 @@ class Round:
         # TurnOrder is marked as not-announcing
         # Table cards as not-announcing
         self.isRoundOver = True
+        for prs in self.playerRoundStatus.values():
+            prs.hand.makeRoundOver()
         self.turn.makeRoundOver()
         self.tableCards.makeRoundOver()
 
