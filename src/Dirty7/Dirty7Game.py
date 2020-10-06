@@ -2,7 +2,6 @@
 """
 
 from fwk.MsgSrc import Connections
-#from Dirty7.Dirty7Round import RoundParameters
 
 class GameState:
     WAITING_FOR_PLAYERS = 1

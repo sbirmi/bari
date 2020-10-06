@@ -55,10 +55,6 @@ Server --> All
       ["UPDATE", roundNum,
        {"PLAY": [playerName, pickedCards, numDrawCards, AdvanceMade]}]
 
-
-Server --> Client
-   ["ROUND-OVER", roundNum <int>, scoreByPlayerName]
-
 Server --> Client
    ["GAME-OVER", list of winning playerNames]
 

@@ -8,6 +8,10 @@ from fwk.Msg import (
         ClientTxMsg,
         InternalGiStatus,
 )
+from fwk.MsgSrc import (
+        Jmai,
+        MsgSrc,
+)
 from fwk.Trace import (
         Level,
         trace,
@@ -56,6 +60,8 @@ class Dirty7Room(GamePlugin):
         self.playerByWs = {}
         self.rounds = []
         self.currRoundTurn = None
+
+        self.winners = None
 
     @property
     def currRound(self):
@@ -146,7 +152,17 @@ class Dirty7Room(GamePlugin):
             return
 
         if isinstance(event, GameOver):
-            assert False
+            assert self.gameState == GameState.ROUND_STOP
+            self.gameState = GameState.GAME_OVER
+            self.publishGiStatus()
+
+            totalScore = self.totalScore()
+            lowestScore = min(totalScore.values())
+
+            winners = [name for name, score in totalScore.items() if score == lowestScore]
+            jmsg = ["GAME-OVER", winners]
+
+            self.winners.setMsgs([Jmai(jmsg, initiatorWs=None)])
             return
 
         if isinstance(event, Declare):
@@ -394,7 +410,7 @@ class Dirty7Room(GamePlugin):
         return False
 
     def postQueueSetup(self):
-        pass
+        self.winners = MsgSrc(self.conns)
 
     def postProcessConnect(self, ws):
         # ws connected but not joined as a player yet

@@ -25,11 +25,12 @@ class Dirty7RoomTest(unittest.TestCase, MsgTestLib):
     def setUp(self):
         random.seed(1)
 
-    def setUpDirty7Room(self):
+    def setUpDirty7Room(self, stopPoints=100):
         rxq = asyncio.Queue()
         txq = asyncio.Queue()
 
-        hostParameters = Dirty7Round.RoundParameters(["basic"], 2, 2, 1, 7, 7, 40, 100)
+        hostParameters = Dirty7Round.RoundParameters(["basic"], 2, 2, 1, 7, 7, 40,
+                                                     stopPoints=stopPoints)
         room = Dirty7Room.Dirty7Room("dirty7:1", "Dirty7 #1", hostParameters)
 
         ws1 = 1
@@ -88,6 +89,69 @@ class Dirty7RoomTest(unittest.TestCase, MsgTestLib):
                                                         ['S', 8], ['C', 13], ['H', 7],
                                                         ['C', 4]]], {2}),
             ], anyOrder=True)
+
+    def testDirty7RoomGameOver(self):
+        env = self.setUpDirty7Room(stopPoints=30)
+        self.drainGiTxQueue(env.txq)
+        turnPlayerName = env.room.rounds[-1].turn.playerNameInTurnOrder[0]
+        turnWs = env.ws1 if turnPlayerName == "plyr1" else env.ws2
+        prs = env.room.rounds[-1].playerRoundStatus[turnPlayerName]
+
+        # Declare with 7 points
+        prs.hand.setCards([Card.Card(Card.SPADES, 7)])
+        self.assertGiTxQueueMsgs(env.txq, [ClientTxMsg(['PLAYER-CARDS', 1, 'plyr2', 1],
+                                                       {env.ws1, env.ws2}),
+                                           ClientTxMsg(['PLAYER-CARDS', 1, 'plyr2', 1,
+                                                        [['S', 7]]],
+                                                       {env.ws2}),
+                                          ], anyOrder=True)
+        env.room.processMsg(ClientRxMsg(["DECLARE"], initiatorWs=turnWs))
+        self.assertGiTxQueueMsgs(env.txq, [ClientTxMsg(['PLAYER-CARDS', 1, 'plyr1', 7,
+                                                        [['C', 9], ['S', 4], ['S', 3], ['D', 12],
+                                                         ['D', 2], ['C', 3], ['S', 8]]],
+                                                       {env.ws1, env.ws2}),
+                                           ClientTxMsg(['PLAYER-CARDS', 1, 'plyr2', 1,
+                                                        [['S', 7]]],
+                                                       {env.ws1, env.ws2}),
+                                           ClientTxMsg(['UPDATE', 1, {'DECLARE': ['plyr2', 7]}],
+                                                       {env.ws1, env.ws2}),
+                                           ClientTxMsg(['ROUND-SCORE', 1,
+                                                        {'plyr1': 39, 'plyr2': 0}],
+                                                       {env.ws1, env.ws2}),
+                                           InternalGiStatus([{'gameState': 6}, 0,
+                                                             env.hostParameters.state], "dirty7:1"),
+                                           ClientTxMsg(['GAME-OVER', ['plyr2']],
+                                                       {env.ws1, env.ws2}),
+                                          ], anyOrder=True)
+
+        # Add a new player (as spectator) and see what messages are created
+        ws10 = 10
+        env.room.processMsg(InternalConnectWsToGi(ws10))
+        self.assertGiTxQueueMsgs(env.txq,
+                                 [ClientTxMsg(['PLAYER-CARDS', 1, 'plyr1', 7,
+                                               [['C', 9], ['S', 4], ['S', 3], ['D', 12],
+                                                ['D', 2], ['C', 3], ['S', 8]]],
+                                              {ws10}),
+                                  ClientTxMsg(['PLAYER-CARDS', 1, 'plyr2', 1,
+                                               [['S', 7]]],
+                                              {ws10}),
+                                  ClientTxMsg(['ROUND-SCORE', 1, {'plyr1': 39, 'plyr2': 0}],
+                                              {ws10}),
+                                  InternalGiStatus([{'gameState': 6}, 0,
+                                                    env.hostParameters.state], "dirty7:1"),
+                                  ClientTxMsg(['GAME-OVER', ['plyr2']], {ws10}),
+                                 ], anyOrder=True)
+
+        # Have the spectator join and see what messages are created
+        env.room.processMsg(ClientRxMsg(["JOIN", "plyr1", "1"], initiatorWs=ws10))
+        self.assertGiTxQueueMsgs(env.txq,
+                                 [ClientTxMsg(['JOIN-OKAY'],
+                                              {ws10}, initiatorWs=ws10),
+                                  ClientTxMsg(['PLAYER-CARDS', 1, 'plyr1', 7,
+                                               [['C', 9], ['S', 4], ['S', 3], ['D', 12],
+                                                ['D', 2], ['C', 3], ['S', 8]]],
+                                              {ws10}),
+                                 ], anyOrder=True)
 
     def testDirty7RoomBasicDeclare(self):
         env = self.setUpDirty7Room()
