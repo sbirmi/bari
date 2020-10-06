@@ -168,8 +168,6 @@ class Dirty7RoomTest(unittest.TestCase, MsgTestLib):
                                               {ws10}),
                                   ClientTxMsg(['ROUND-SCORE', 1, {'plyr1': 39, 'plyr2': 0}],
                                               {ws10}),
-                                  ClientTxMsg(['TABLE-CARDS', 1, 90, 0, [['D', 7]]],
-                                              {ws10}),
                                   ClientTxMsg(['TURN-ORDER', 2, ['plyr2', 'plyr1']],
                                               {ws10}),
                                   ClientTxMsg(['TURN', 2, 'plyr1'],

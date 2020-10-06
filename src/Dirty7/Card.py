@@ -60,12 +60,12 @@ class CardGroupBase:
     def refresh(self):
         if self.connsMsgSrc:
             jmsgs = self._connsJmsgs()
-            if jmsgs:
+            if jmsgs is not None:
                 self.connsMsgSrc.setMsgs(jmsgs)
 
         if self.playerConnsMsgSrc:
             jmsgs = self._playerConnsJmsgs()
-            if jmsgs:
+            if jmsgs is not None:
                 self.playerConnsMsgSrc.setMsgs(jmsgs)
 
     def _connsJmsgs(self):
