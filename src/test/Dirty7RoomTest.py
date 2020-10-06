@@ -118,7 +118,7 @@ class Dirty7RoomTest(unittest.TestCase, MsgTestLib):
                                            ClientTxMsg(['ROUND-SCORE', 1,
                                                         {'plyr1': 39, 'plyr2': 0}],
                                                        {env.ws1, env.ws2}),
-                                           InternalGiStatus([{'gameState': 6}, 0,
+                                           InternalGiStatus([{'gameState': 'GameOver'}, 0,
                                                              env.hostParameters.state], "dirty7:1"),
                                            ClientTxMsg(['GAME-OVER', ['plyr2']],
                                                        {env.ws1, env.ws2}),
@@ -137,7 +137,7 @@ class Dirty7RoomTest(unittest.TestCase, MsgTestLib):
                                               {ws10}),
                                   ClientTxMsg(['ROUND-SCORE', 1, {'plyr1': 39, 'plyr2': 0}],
                                               {ws10}),
-                                  InternalGiStatus([{'gameState': 6}, 0,
+                                  InternalGiStatus([{'gameState': 'GameOver'}, 0,
                                                     env.hostParameters.state], "dirty7:1"),
                                   ClientTxMsg(['GAME-OVER', ['plyr2']], {ws10}),
                                  ], anyOrder=True)
@@ -215,7 +215,7 @@ class Dirty7RoomTest(unittest.TestCase, MsgTestLib):
                                                        {env.ws2}),
                                            ClientTxMsg(['TABLE-CARDS', 2, 90, 0, [['H', 4]]],
                                                        {env.ws1, env.ws2}),
-                                           InternalGiStatus([{'gameState': 4}, 0,
+                                           InternalGiStatus([{'gameState': 'PlayerTurn'}, 0,
                                                              env.hostParameters.state], "dirty7:1"),
                                           ], anyOrder=True)
 
@@ -244,7 +244,7 @@ class Dirty7RoomTest(unittest.TestCase, MsgTestLib):
                                               {ws10}),
                                   ClientTxMsg(['ROUND-SCORE', 2, {'plyr1': None, 'plyr2': None}],
                                               {ws10}),
-                                  InternalGiStatus([{'gameState': 4}, 0,
+                                  InternalGiStatus([{'gameState': 'PlayerTurn'}, 0,
                                                     env.hostParameters.state], "dirty7:1"),
                                  ], anyOrder=True)
 
@@ -275,13 +275,15 @@ class Dirty7RoomTest(unittest.TestCase, MsgTestLib):
                    ):
             env.room.processMsg(msg)
 
-        self.assertGiTxQueueMsgs(env.txq, [InternalGiStatus([{'gameState': 1}, 0,
+        self.assertGiTxQueueMsgs(env.txq, [InternalGiStatus([{'gameState': 'WaitingForPlayers'}, 0,
                                                              env.hostParameters.state], "dirty7:1"),
-                                           InternalGiStatus([{'gameState': 1}, 0,
+                                           InternalGiStatus([{'gameState': 'WaitingForPlayers'}, 0,
+                                                             env.hostParameters.state], "dirty7:1"),
+                                           InternalGiStatus([{'gameState': 'WaitingForPlayers'}, 0,
                                                              env.hostParameters.state], "dirty7:1"),
                                            ClientTxMsg(["JOIN-OKAY"], {env.ws1},
                                                        initiatorWs=env.ws1),
-                                           InternalGiStatus([{'gameState': 1}, 0,
+                                           InternalGiStatus([{'gameState': 'WaitingForPlayers'}, 0,
                                                              env.hostParameters.state], "dirty7:1"),
                                            ClientTxMsg(["JOIN-OKAY"], {env.ws2},
                                                        initiatorWs=env.ws2),
@@ -304,7 +306,7 @@ class Dirty7RoomTest(unittest.TestCase, MsgTestLib):
                                                        {env.ws2}),
                                            ClientTxMsg(['TABLE-CARDS', 1, 90, 0, [['D', 7]]],
                                                        {env.ws1, env.ws2}),
-                                           InternalGiStatus([{'gameState': 4}, 0,
+                                           InternalGiStatus([{'gameState': 'PlayerTurn'}, 0,
                                                              env.hostParameters.state], "dirty7:1"),
                                            ClientTxMsg(['PLAY-BAD', 'It is not your turn'],
                                                        {env.ws1}, initiatorWs=env.ws1),
@@ -326,13 +328,15 @@ class Dirty7RoomTest(unittest.TestCase, MsgTestLib):
                    ):
             env.room.processMsg(msg)
 
-        self.assertGiTxQueueMsgs(env.txq, [InternalGiStatus([{'gameState': 1}, 0,
+        self.assertGiTxQueueMsgs(env.txq, [InternalGiStatus([{'gameState': 'WaitingForPlayers'}, 0,
                                                              env.hostParameters.state], "dirty7:1"),
-                                           InternalGiStatus([{'gameState': 1}, 0,
+                                           InternalGiStatus([{'gameState': 'WaitingForPlayers'}, 0,
+                                                             env.hostParameters.state], "dirty7:1"),
+                                           InternalGiStatus([{'gameState': 'WaitingForPlayers'}, 0,
                                                              env.hostParameters.state], "dirty7:1"),
                                            ClientTxMsg(["JOIN-OKAY"], {env.ws1},
                                                        initiatorWs=env.ws1),
-                                           InternalGiStatus([{'gameState': 1}, 0,
+                                           InternalGiStatus([{'gameState': 'WaitingForPlayers'}, 0,
                                                              env.hostParameters.state], "dirty7:1"),
                                            ClientTxMsg(["JOIN-OKAY"], {env.ws2},
                                                        initiatorWs=env.ws2),
@@ -355,7 +359,7 @@ class Dirty7RoomTest(unittest.TestCase, MsgTestLib):
                                                        {env.ws2}),
                                            ClientTxMsg(['TABLE-CARDS', 1, 90, 0, [['D', 7]]],
                                                        {env.ws1, env.ws2}),
-                                           InternalGiStatus([{'gameState': 4}, 0,
+                                           InternalGiStatus([{'gameState': 'PlayerTurn'}, 0,
                                                              env.hostParameters.state], "dirty7:1"),
                                            ClientTxMsg(['TABLE-CARDS', 1, 89, 1, [['H', 3]]],
                                                        {env.ws1, env.ws2}),
@@ -390,12 +394,18 @@ class Dirty7RoomTest(unittest.TestCase, MsgTestLib):
                    ):
             room.processMsg(msg)
 
-        self.assertGiTxQueueMsgs(txq, [InternalGiStatus([{'gameState': 1}, 0, hostParameters.state],
+        self.assertGiTxQueueMsgs(txq, [InternalGiStatus([{'gameState': 'WaitingForPlayers'}, 0,
+                                                         hostParameters.state],
+                                                        "dirty7:1"),
+                                       InternalGiStatus([{'gameState': 'WaitingForPlayers'}, 0,
+                                                         hostParameters.state],
                                                         "dirty7:1"),
                                        ClientTxMsg(["JOIN-OKAY"], {1}, initiatorWs=1),
-                                       InternalGiStatus([{'gameState': 1}, 0, hostParameters.state],
+                                       InternalGiStatus([{'gameState': 'WaitingForPlayers'}, 0,
+                                                         hostParameters.state],
                                                         "dirty7:1"),
-                                       InternalGiStatus([{'gameState': 1}, 0, hostParameters.state],
+                                       InternalGiStatus([{'gameState': 'WaitingForPlayers'}, 0,
+                                                         hostParameters.state],
                                                         "dirty7:1"),
                                        ClientTxMsg(['JOIN-OKAY'], {2}, initiatorWs=2),
                                        ClientTxMsg(['TURN-ORDER', 1, ['plyr2', 'plyr1']], {1, 2}),
@@ -412,7 +422,8 @@ class Dirty7RoomTest(unittest.TestCase, MsgTestLib):
                                                     [['C', 13], ['H', 7], ['C', 4], ['H', 3],
                                                      ['S', 1], ['D', 13], ['S', 1]]], {2}),
                                        ClientTxMsg(['TABLE-CARDS', 1, 90, 0, [['D', 7]]], {1, 2}),
-                                       InternalGiStatus([{'gameState': 4}, 0, hostParameters.state],
+                                       InternalGiStatus([{'gameState': 'PlayerTurn'}, 0,
+                                                         hostParameters.state],
                                                         "dirty7:1"),
                                       ])
 

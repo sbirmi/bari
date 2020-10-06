@@ -3,13 +3,32 @@
 
 from fwk.MsgSrc import Connections
 
-class GameState:
-    WAITING_FOR_PLAYERS = 1
-    GAME_BEGIN = 2
-    ROUND_START = 3
-    PLAYER_TURN = 4
-    ROUND_STOP = 5
-    GAME_OVER = 6
+class GameStateBase:
+    def toJmsg(self):
+        return str(self)
+
+    def __str__(self):
+        assert self.__class__.__name__.startswith("State")
+        return self.__class__.__name__[5:]
+
+
+class StateWaitingForPlayers(GameStateBase):
+    pass
+
+class StateGameBegin(GameStateBase):
+    pass
+
+class StateRoundStart(GameStateBase):
+    pass
+
+class StatePlayerTurn(GameStateBase):
+    pass
+
+class StateRoundStop(GameStateBase):
+    pass
+
+class StateGameOver(GameStateBase):
+    pass
 
 class Player:
     def __init__(self, txQueue, name, passwd):

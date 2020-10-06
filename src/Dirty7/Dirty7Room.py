@@ -20,7 +20,12 @@ from Dirty7.Card import (
         Card,
 )
 from Dirty7.Dirty7Game import (
-        GameState,
+        StateGameBegin,
+        StateGameOver,
+        StatePlayerTurn,
+        StateRoundStart,
+        StateRoundStop,
+        StateWaitingForPlayers,
         Player,
 )
 from Dirty7.Dirty7Round import (
@@ -55,7 +60,7 @@ class Dirty7Room(GamePlugin):
         GamePlugin.__init__(self, path, name)
         self.hostParameters = hostParameters
 
-        self.gameState = GameState.WAITING_FOR_PLAYERS
+        self.gameState = StateWaitingForPlayers()
         self.playerByName = {}
         self.playerByWs = {}
         self.rounds = []
@@ -97,7 +102,7 @@ class Dirty7Room(GamePlugin):
         trace(Level.game, "processEvent", str(event), "in state", self.gameState)
         if isinstance(event, PlayerJoin):
             # A new player has joined
-            assert self.gameState == GameState.WAITING_FOR_PLAYERS
+            assert isinstance(self.gameState, StateWaitingForPlayers)
 
             if len(self.playerByName) == self.hostParameters.numPlayers:
                 self.processEvent(GameBegin())
@@ -108,19 +113,19 @@ class Dirty7Room(GamePlugin):
             return
 
         if isinstance(event, GameBegin):
-            assert self.gameState == GameState.WAITING_FOR_PLAYERS
+            assert isinstance(self.gameState, StateWaitingForPlayers)
             self.startGame()
-            self.gameState = GameState.GAME_BEGIN
+            self.gameState = StateGameBegin()
             turnOrderNames = list(self.playerByName)
             random.shuffle(turnOrderNames)
             self.processEvent(StartRound(1, turnOrderNames, 0))
             return
 
         if isinstance(event, StartRound):
-            assert self.gameState in {GameState.GAME_BEGIN, GameState.ROUND_STOP}
-            self.gameState = GameState.ROUND_START
+            assert isinstance(self.gameState, (StateGameBegin, StateRoundStop))
+            self.gameState = StateRoundStart()
             self.newRound(event)
-            self.gameState = GameState.PLAYER_TURN
+            self.gameState = StatePlayerTurn()
             self.publishGiStatus()
             return
 
@@ -129,8 +134,8 @@ class Dirty7Room(GamePlugin):
             return
 
         if isinstance(event, StopRound):
-            assert self.gameState == GameState.PLAYER_TURN
-            self.gameState = GameState.ROUND_STOP
+            assert isinstance(self.gameState, StatePlayerTurn)
+            self.gameState = StateRoundStop()
 
             # Stop the current round (mark it as round-over) so that
             # irrelevant notifications are not sent out
@@ -152,8 +157,8 @@ class Dirty7Room(GamePlugin):
             return
 
         if isinstance(event, GameOver):
-            assert self.gameState == GameState.ROUND_STOP
-            self.gameState = GameState.GAME_OVER
+            assert isinstance(self.gameState, StateRoundStop)
+            self.gameState = StateGameOver()
             self.publishGiStatus()
 
             totalScore = self.totalScore()
@@ -166,7 +171,7 @@ class Dirty7Room(GamePlugin):
             return
 
         if isinstance(event, Declare):
-            assert self.gameState == GameState.PLAYER_TURN
+            assert isinstance(self.gameState, StatePlayerTurn)
             self.currRound.declare(event) # calculate points based on declaring
             self.processEvent(StopRound(self.currRound.roundParams.roundNum))
             return
@@ -216,7 +221,8 @@ class Dirty7Room(GamePlugin):
             self.processEvent(PlayerJoin(player))
             return True
 
-        if playerName not in self.playerByName and self.gameState != GameState.WAITING_FOR_PLAYERS:
+        if playerName not in self.playerByName and not isinstance(self.gameState,
+                                                                  StateWaitingForPlayers):
             # New player trying to join after the game has started
             self.txQueue.put_nowait(ClientTxMsg(["JOIN-BAD", "Invalid player name/password or "
                                                  "trying to join a running game"],
@@ -252,7 +258,7 @@ class Dirty7Room(GamePlugin):
         """
         ws = qmsg.initiatorWs
 
-        if self.gameState != GameState.PLAYER_TURN:
+        if not isinstance(self.gameState, StatePlayerTurn):
             self.txQueue.put_nowait(ClientTxMsg(["PLAY-BAD", "Can't make moves now"],
                                                 {ws}, initiatorWs=ws))
             return True
@@ -361,7 +367,7 @@ class Dirty7Room(GamePlugin):
         """
         ws = qmsg.initiatorWs
 
-        if self.gameState != GameState.PLAYER_TURN:
+        if not isinstance(self.gameState, StatePlayerTurn):
             self.txQueue.put_nowait(ClientTxMsg(["DECLARE-BAD", "Can't make moves now"],
                                                 {ws}, initiatorWs=ws))
             return True
@@ -410,6 +416,7 @@ class Dirty7Room(GamePlugin):
         return False
 
     def postQueueSetup(self):
+        self.publishGiStatus()
         self.winners = MsgSrc(self.conns)
 
     def postProcessConnect(self, ws):
@@ -435,4 +442,4 @@ class Dirty7Room(GamePlugin):
     def publishGiStatus(self):
         # Publish number of clients connected to this room
         self.txQueue.put_nowait(InternalGiStatus(
-            [{"gameState": self.gameState}] + self.hostParameters.toJmsg(), self.path))
+            [{"gameState": self.gameState.toJmsg()}] + self.hostParameters.toJmsg(), self.path))

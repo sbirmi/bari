@@ -12,6 +12,17 @@
 # Messages
 
 Server --> Client
+   When waiting for players
+      ["GAME-STATUS", <path:str>, {"gameState": <str>,
+                                   "playerCount": dict},
+       0 (roundNum),
+       <hostParams:dict>,]
+   When game has started
+      ["GAME-STATUS", <path:str>, {"gameState": <str>,
+                                   "playerCount": dict},
+       <roundParams:dict>,]
+
+Server --> Client
    ["ROUND-PARAMETERS", roundNum <int>, {"numDecks": <int>,
                                           "numJokers": <int>,
                                           "numCardsToStart": <int>,
@@ -57,7 +68,6 @@ Server --> All
 
 Server --> Client
    ["GAME-OVER", list of winning playerNames]
-
 
 # Internal state machine
 
