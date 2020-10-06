@@ -29,6 +29,7 @@ from Dirty7.Exceptions import (
 )
 from Dirty7.Events import (
         AdvanceTurn,
+        Declare,
         GameBegin,
         GameOver,
         PlayerJoin,
@@ -54,23 +55,37 @@ class Dirty7Room(GamePlugin):
         self.playerByName = {}
         self.playerByWs = {}
         self.rounds = []
-        self.turn = None
+        self.currRoundTurn = None
+
+    @property
+    def currRound(self):
+        return self.rounds[-1]
 
     def newRound(self, startRound):
         roundNum = startRound.roundNum
         trace(Level.rnd, self.path, "starting round", roundNum)
 
-        self.turn = Turn(self.conns, roundNum, startRound.turnOrderNames, startRound.turnIdx)
+        self.currRoundTurn = Turn(self.conns, roundNum, startRound.turnOrderNames,
+                                  startRound.turnIdx)
 
         # Get round parameters
         roundParameters = self.hostParameters.roundParameters(roundNum)
 
         round_ = Round(self.path, self.conns, roundParameters,
-                       self.playerByName, self.turn)
+                       self.playerByName, self.currRoundTurn)
         self.rounds.append(round_)
 
     def startGame(self):
         trace(Level.game, self.path, "starting")
+
+    def totalScore(self):
+        totalScoreByName = {name: 0 for name in self.playerByName}
+        for round_ in self.rounds:
+            scoreByName = round_.roundScore.scoreByPlayerName
+            for name, score in (scoreByName or {}).items():
+                if score:
+                    totalScoreByName[name] += score
+        return totalScoreByName
 
     def processEvent(self, event):
         trace(Level.game, "processEvent", str(event), "in state", self.gameState)
@@ -104,17 +119,44 @@ class Dirty7Room(GamePlugin):
             return
 
         if isinstance(event, AdvanceTurn):
-            self.turn.advance(event)
-            self.publishGiStatus()
+            self.currRound.turn.advance(event)
             return
 
         if isinstance(event, StopRound):
+            assert self.gameState == GameState.PLAYER_TURN
+            self.gameState = GameState.ROUND_STOP
+
+            # Stop the current round (mark it as round-over) so that
+            # irrelevant notifications are not sent out
+            self.currRound.makeRoundOver()
+
+            # Check if the end of game limit is hit. Trigger
+            # GameOver in which case
+            totalScore = self.totalScore()
+            maxScore = max(totalScore.values())
+            if maxScore >= self.hostParameters.stopPoints:
+                self.processEvent(GameOver())
+                return
+
+            # Else, start a new round
+            self.processEvent(StartRound(self.currRound.roundNum+1,
+                                         self.currRound.turn.playerNameInTurnOrder,
+                                         turnIdx=(self.currRound.turn.turnIdx + 1) %
+                                         self.hostParameters.numPlayers))
             return
 
         if isinstance(event, GameOver):
+            assert False
+            return
+
+        if isinstance(event, Declare):
+            assert self.gameState == GameState.PLAYER_TURN
+            self.currRound.declare(event) # calculate points based on declaring
+            self.processEvent(StopRound(self.currRound.roundParams.roundNum))
             return
 
         trace(Level.error, "Invalid event received", str(event))
+        assert False
 
     def processJoin(self, qmsg):
         """
@@ -204,12 +246,10 @@ class Dirty7Room(GamePlugin):
                                                 {ws}, initiatorWs=ws))
             return True
 
-        if self.playerByWs[ws].name != self.turn.current():
+        if self.playerByWs[ws].name != self.currRound.turn.current():
             self.txQueue.put_nowait(ClientTxMsg(["PLAY-BAD", "It is not your turn"],
                                                 {ws}, initiatorWs=ws))
             return True
-
-
 
         if len(qmsg.jmsg) != 2:
             self.txQueue.put_nowait(ClientTxMsg(["PLAY-BAD", "Invalid message length"],
@@ -264,34 +304,75 @@ class Dirty7Room(GamePlugin):
                                                  playDesc], {ws}, initiatorWs=ws))
             return True
 
-        currRound = self.rounds[-1]
-
         # If the deck doesn't have numDrawCards
-        if currRound.tableCards.deckCardCount() < numDrawCards:
+        if self.currRound.tableCards.deckCardCount() < numDrawCards:
             self.txQueue.put_nowait(ClientTxMsg(["PLAY-BAD", "Drawing invalid number of cards",
                                                  numDrawCards], {ws}, initiatorWs=ws))
             return None
 
         # pickCards should be in revealedCards
-        if not currRound.tableCards.revealedCardsContains(pickCards):
+        if not self.currRound.tableCards.revealedCardsContains(pickCards):
             self.txQueue.put_nowait(ClientTxMsg(["PLAY-BAD", "Picking cards not available",
                                                  [cd.toJmsg() for cd in pickCards]], {ws},
                                                 initiatorWs=ws))
             return True
 
-        event = currRound.rule.processPlay(currRound, self.playerByWs[ws],
-                                           dropCards, numDrawCards, pickCards)
+        event = self.currRound.rule.processPlay(self.currRound, self.playerByWs[ws],
+                                                dropCards, numDrawCards, pickCards)
 
         if not event:
             self.txQueue.put_nowait(ClientTxMsg(["PLAY-BAD", "Invalid play"],
                                                 {ws}, initiatorWs=ws))
         else:
-            jmsg = ["UPDATE", currRound.roundParams.roundNum,
+            jmsg = ["UPDATE", self.currRound.roundParams.roundNum,
                     {"PLAY": [self.playerByWs[ws].name,
                               [cd.toJmsg() for cd in dropCards],
                               numDrawCards,
                               [cd.toJmsg() for cd in pickCards]] +
                              event.toJmsg()}]
+            self.broadcast(jmsg)
+            self.processEvent(event)
+
+        return True
+
+    def processDeclare(self, qmsg):
+        """
+        ["DECLARE"]
+        Should only be processed if:
+        1. game state is player turn
+        2. ws has joined
+        3. player[ws].name == turn.current()
+        """
+        ws = qmsg.initiatorWs
+
+        if self.gameState != GameState.PLAYER_TURN:
+            self.txQueue.put_nowait(ClientTxMsg(["DECLARE-BAD", "Can't make moves now"],
+                                                {ws}, initiatorWs=ws))
+            return True
+
+        if self.playerByWs[ws] is None:
+            self.txQueue.put_nowait(ClientTxMsg(["DECLARE-BAD", "You must join the game first"],
+                                                {ws}, initiatorWs=ws))
+            return True
+
+        if self.playerByWs[ws].name != self.currRound.turn.current():
+            self.txQueue.put_nowait(ClientTxMsg(["DECLARE-BAD", "It is not your turn"],
+                                                {ws}, initiatorWs=ws))
+            return True
+
+        if len(qmsg.jmsg) != 1:
+            self.txQueue.put_nowait(ClientTxMsg(["DECLARE-BAD", "Invalid message length"],
+                                                {ws}, initiatorWs=ws))
+            return True
+
+        event = self.currRound.rule.processDeclare(self.currRound, self.playerByWs[ws])
+
+        if not event:
+            self.txQueue.put_nowait(ClientTxMsg(["DECLARE-BAD", "Invalid declare"],
+                                                {ws}, initiatorWs=ws))
+        else:
+            jmsg = ["UPDATE", self.currRound.roundParams.roundNum,
+                    {"DECLARE": event.toJmsg()}]
             self.broadcast(jmsg)
             self.processEvent(event)
 
@@ -306,6 +387,9 @@ class Dirty7Room(GamePlugin):
 
         if qmsg.jmsg[0] == "PLAY":
             return self.processPlay(qmsg)
+
+        if qmsg.jmsg[0] == "DECLARE":
+            return self.processDeclare(qmsg)
 
         return False
 

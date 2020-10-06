@@ -7,6 +7,7 @@ not retained locally.
 from Dirty7 import Dirty7Round
 from Dirty7.Events import (
         AdvanceTurn,
+        Declare,
 )
 from Dirty7.Exceptions import InvalidPlayException
 from fwk.Trace import (
@@ -23,7 +24,6 @@ class MoveProcessor:
     def makePlay(self, tableCards, playerHand, dropCards, numDrawCards, pickCards):
         gainCards = tableCards.delta(dropCards, pickCards, numDrawCards)
         playerHand.delta(dropCards, gainCards)
-
 
     def processPlay(self, round_, player, dropCards, numDrawCards, pickCards):
         """Returns None if the play message was not processed.
@@ -131,6 +131,28 @@ class RuleEngine:
             hostParams.state.stopPoints,
             roundNum=roundNum)
         return roundParameters
+
+    def processDeclare(self, round_, player):
+        """
+        If declareMaxPoints is specified, make sure that the person
+        declaring has points <= declareMaxPoints.
+
+        Return Declare() event if it is a valid declare, None otherwise.
+        """
+        roundParams = round_.roundParams
+        playerRoundStatus = round_.playerRoundStatus[player.name]
+        playerHand = playerRoundStatus.hand
+        handScore = playerHand.score(self)
+
+        if (roundParams.declareMaxPoints and
+                handScore > roundParams.declareMaxPoints):
+            trace(Level.info, "Declaring with", handScore, "points >",
+                  roundParams.declareMaxPoints, "points.",
+                  [str(cd) for cd in playerHand.cards])
+            return None
+
+        # Points are sufficiently low
+        return Declare(player, handScore)
 
     def processPlay(self, round_, player, dropCards, numDrawCards, pickCards):
         """On valid play, make the change thru round_ and have that generate the

@@ -49,8 +49,12 @@ class GameOver(EventBase):
         return "Game over"
 
 class Declare(EventBase):
-    def __init__(self, playerName):
-        self.playerName = playerName
+    def __init__(self, player, score):
+        self.player = player
+        self.score = score
 
     def __str__(self):
-        return "Declare by " + self.playerName
+        return "Declare by " + self.player.name + " at %d points" % self.score
+
+    def toJmsg(self):
+        return [self.player.name, self.score]

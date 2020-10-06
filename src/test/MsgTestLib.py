@@ -34,10 +34,23 @@ class MsgTestLib:
 
             else:
                 # Order is important
-                expectedMsg = expectedMsgs.pop(0)
+                try:
+                    expectedMsg = expectedMsgs.pop(0)
+                except IndexError:
+                    raise AssertionError("Found more messages than in the txqueue "
+                                         "than expected message:\n" + str(tmsg))
                 assert tmsg == expectedMsg, "Mismatch at offset {}: {} != {}".format(
                     i, tmsg, expectedMsg)
             i += 1
 
-        assert not expectedMsgs, """Some expected messages not found:
+        assert not expectedMsgs, """txq drained, some expected messages not found:
 {}""".format("\n".join(expectedMsgs))
+
+    def drainGiTxQueue(self, txq, count=None):
+        """Drain the game instance TX queue of messages"""
+        if count is None:
+            while not txq.empty():
+                txq.get_nowait()
+        else:
+            for _ in range(count):
+                txq.get_nowait()

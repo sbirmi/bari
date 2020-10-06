@@ -2,6 +2,7 @@
 defined here.
 """
 
+from collections import defaultdict
 import random
 
 from fwk.Common import Map
@@ -33,16 +34,19 @@ def removeCards(cards1, cards2):
 
 class Turn(MsgSrc):
     """Tracks turn order and whose turn it is"""
-    def __init__(self, conns, roundNum, playerNameInTurnOrder, turnIdx):
+    def __init__(self, conns, roundNum, playerNameInTurnOrder, turnIdx,
+                 isRoundOver=False):
         MsgSrc.__init__(self, conns)
         self.roundNum = roundNum
         self.playerNameInTurnOrder = playerNameInTurnOrder
         self.numPlayers = len(self.playerNameInTurnOrder)
         self.turnIdx = turnIdx
+        self.isRoundOver = isRoundOver
 
-        jmsg1 = ["TURN-ORDER", self.roundNum, self.playerNameInTurnOrder]
-        jmsg2 = ["TURN", self.roundNum, self.current()]
-        self.setMsgs([Jmai(jmsg1, None), Jmai(jmsg2, None)])
+        if not isRoundOver:
+            jmsg1 = ["TURN-ORDER", self.roundNum, self.playerNameInTurnOrder]
+            jmsg2 = ["TURN", self.roundNum, self.current()]
+            self.setMsgs([Jmai(jmsg1, None), Jmai(jmsg2, None)])
 
     def advance(self, advanceTurn):
         self.turnIdx = (self.turnIdx + advanceTurn.turnStep) % self.numPlayers
@@ -52,6 +56,9 @@ class Turn(MsgSrc):
     def current(self):
         return self.playerNameInTurnOrder[self.turnIdx]
 
+    def makeRoundOver(self):
+        self.isRoundOver = True
+        self.setMsgs([])
 
 class Round:
     def __init__(self, path, conns, roundParams,
@@ -88,6 +95,35 @@ class Round:
                                      revealedCards=revealedCards)
 
         self.rule = SupportedRules[next(iter(roundParams.state.ruleNames))]
+
+    @property
+    def roundNum(self):
+        return self.roundParams.roundNum
+
+    def makeRoundOver(self):
+        # TurnOrder is marked as not-announcing
+        # Table cards as not-announcing
+        self.isRoundOver = True
+        self.turn.makeRoundOver()
+        self.tableCards.makeRoundOver()
+
+    def declare(self, event):
+        playerScores = {name: prs.hand.score(self.rule)
+                        for name, prs in self.playerRoundStatus.items()}
+        scorePlayers = defaultdict(set)
+
+        uniqueScores = sorted(playerScores.values())
+        for name, score in playerScores.items():
+            scorePlayers[score].add(name)
+
+        if uniqueScores[0] < event.score or len(scorePlayers[event.score]) > 1:
+            for name in playerScores[uniqueScores[0]]:
+                playerScores[name] = 0
+            playerScores[event.name] = self.roundParams.penaltyPoints
+        else:
+            playerScores[event.player.name] = 0
+
+        self.roundScore.setScores(playerScores)
 
 class RoundParameters:
     ctrArgs = ("ruleNames",
@@ -206,12 +242,18 @@ class TableCards(CardGroupBase):
     def __init__(self, conns, roundNum,
                  deckCards=None,
                  revealedCards=None,
-                 hiddenCards=None):
+                 hiddenCards=None,
+                 isRoundOver=False):
         self.roundNum = roundNum
         self.deckCards = deckCards
         self.revealedCards = revealedCards
         self.hiddenCards = hiddenCards or []
+        self.isRoundOver = isRoundOver
         CardGroupBase.__init__(self, conns, playerConns=None)
+
+    def makeRoundOver(self):
+        self.isRoundOver = True
+        self.refresh()
 
     def revealedCardsContains(self, cards):
         return CardGroupBase.contains(self.revealedCards, cards)
@@ -248,6 +290,9 @@ class TableCards(CardGroupBase):
         return playerGainCards
 
     def _connsJmsgs(self):
+        if self.isRoundOver:
+            return []
+
         if (self.deckCards is None or self.revealedCards is None or
                 self.hiddenCards is None):
             return None
@@ -280,6 +325,9 @@ class PlayerHand(CardGroupBase):
         CardGroupBase.__init__(self, conns, playerConns)
         self.setCards(cards)
 
+    def score(self, rule):
+        return sum(rule.cardPoints(cd) for cd in self.cards)
+
     def setCards(self, cards):
         self.cards = cards
         self.refresh()
@@ -287,7 +335,7 @@ class PlayerHand(CardGroupBase):
     def contains(self, cards): # pylint: disable=arguments-differ
         return CardGroupBase.contains(self.cards, cards)
 
-    def roundOver(self):
+    def makeRoundOver(self):
         """Reveals the hand to all players"""
         self.isRoundOver = True
         self.refresh()
