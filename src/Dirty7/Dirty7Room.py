@@ -185,6 +185,11 @@ class Dirty7Room(GamePlugin):
         """
         ws = qmsg.initiatorWs
 
+        if isinstance(self.gameState, StateGameOver):
+            self.txQueue.put_nowait(ClientTxMsg(["JOIN-BAD",
+                                                 "Game over already"], {ws}, initiatorWs=ws))
+            return True
+
         if ws not in self.playerByWs or self.playerByWs[ws]:
             self.txQueue.put_nowait(ClientTxMsg(["JOIN-BAD",
                                                  "Unexpected JOIN message from client that "
@@ -438,8 +443,16 @@ class Dirty7Room(GamePlugin):
 
         self.publishGiStatus()
 
+    def spectatorCount(self):
+        return sum(1 for plyr in self.playerByWs.values() if not plyr)
 
     def publishGiStatus(self):
         # Publish number of clients connected to this room
-        self.txQueue.put_nowait(InternalGiStatus(
-            [{"gameState": self.gameState.toJmsg()}] + self.hostParameters.toJmsg(), self.path))
+        jmsg = [{"gameState": self.gameState.toJmsg(),
+                 "clientCount": {name: player.playerConns.count() for name, player in
+                                 self.playerByName.items()},
+                 "spectatorCount": self.spectatorCount()}]
+        jmsg += self.hostParameters.toJmsg()
+        if self.rounds:
+            jmsg += self.currRound.roundParams.toJmsg()
+        self.txQueue.put_nowait(InternalGiStatus(jmsg, self.path))

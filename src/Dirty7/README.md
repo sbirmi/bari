@@ -14,13 +14,15 @@
 Server --> Client
    When waiting for players
       ["GAME-STATUS", <path:str>, {"gameState": <str>,
-                                   "playerCount": dict},
-       0 (roundNum),
-       <hostParams:dict>,]
+                                   "clientCount": dict,
+                                   "spectatorCount": <int>},
+       0 (roundNum), <hostParams:dict>,]
    When game has started
       ["GAME-STATUS", <path:str>, {"gameState": <str>,
-                                   "playerCount": dict},
-       <roundParams:dict>,]
+                                   "clientCount": dict,
+                                   "spectatorCount": <int>},
+       0 (roundNum), <hostParams:dict>,
+       N (roundNum), <roundParams:dict>,]
 
 Server --> Client
    ["ROUND-PARAMETERS", roundNum <int>, {"numDecks": <int>,
