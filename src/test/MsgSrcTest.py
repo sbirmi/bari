@@ -59,10 +59,11 @@ class MsgSrcConnectionsTest(unittest.TestCase, MsgTestLib):
 
         # Adding a second connection
         self.conns.addConn(clientWs2)
-        self.assertGiTxQueueMsgs(self.txq, {ClientTxMsg([1], {clientWs2}, initiatorWs=clientWs3),
+        self.assertGiTxQueueMsgs(self.txq, [ClientTxMsg([1], {clientWs2}, initiatorWs=clientWs3),
                                             ClientTxMsg([2], {clientWs2}, initiatorWs=clientWs3),
                                             ClientTxMsg([True], {clientWs2}, initiatorWs=None),
-                                            ClientTxMsg([False], {clientWs2}, initiatorWs=None)})
+                                            ClientTxMsg([False], {clientWs2}, initiatorWs=None)],
+                                 anyOrder=True)
 
         # Adding msgSrc with state preset
         msgSrc2.setMsgs([Jmai(["yes"], initiatorWs=None)])
@@ -74,8 +75,9 @@ class MsgSrcConnectionsTest(unittest.TestCase, MsgTestLib):
         # Add another client
         self.conns.addConn(clientWs3)
         self.assertSetEqual(self.conns.msgSrcs, {msgSrc1})
-        self.assertGiTxQueueMsgs(self.txq, {ClientTxMsg([1], {clientWs3}, initiatorWs=clientWs3),
-                                            ClientTxMsg([2], {clientWs3}, initiatorWs=clientWs3)})
+        self.assertGiTxQueueMsgs(self.txq, [ClientTxMsg([1], {clientWs3}, initiatorWs=clientWs3),
+                                            ClientTxMsg([2], {clientWs3}, initiatorWs=clientWs3)],
+                                 anyOrder=True)
 
         # Remove a client
         self.conns.delConn(clientWs2)
@@ -83,5 +85,6 @@ class MsgSrcConnectionsTest(unittest.TestCase, MsgTestLib):
 
         # Add msgSrc2 again
         self.conns.addMsgSrc(msgSrc2)
-        self.assertGiTxQueueMsgs(self.txq, {ClientTxMsg(["yes"], {clientWs1, clientWs3},
-                                                        initiatorWs=None)})
+        self.assertGiTxQueueMsgs(self.txq, [ClientTxMsg(["yes"], {clientWs1, clientWs3},
+                                                        initiatorWs=None)],
+                                 anyOrder=True)

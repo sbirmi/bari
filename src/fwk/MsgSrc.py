@@ -84,11 +84,18 @@ class MsgSrc:
     def __init__(self, conns):
         self._conns = conns
         self._jmaiList = []
-        self._lastInitiatorWs = None
         self._conns.addMsgSrc(self)
 
     def __del__(self):
         self._conns.delMsgSrc(self)
+
+    def addMsgs(self, jmaiList):
+        self._jmaiList.append(jmaiList)
+        self._conns.send(jmaiList)
+
+    def replaceMsg(self, idx, jmai):
+        self._jmaiList[idx] = jmai
+        self._conns.send([jmai])
 
     def setMsgs(self, jmaiList):
         """Buffer messages each with initiator"""

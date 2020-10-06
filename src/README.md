@@ -91,6 +91,8 @@ hosting a new game, automatically redirect to that game.
 5. Broadcast messages to just the game?
 6. How does the Lobby on hosting a game register queues with the main loop?
 
+1. Need to add version number for lobby, chat lobby + room
+
 
 Design Invariants
 -----------------
