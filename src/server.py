@@ -11,6 +11,9 @@ import itertools
 import json
 import websockets
 
+from config import (
+        WS_SERVER_PORT_DEFAULT,
+)
 from fwk.ServerQueueTask import (
         clientTxMsg,
         clientTxQueueAdd,
@@ -138,9 +141,10 @@ async def giTxQueue(queue):
             await clientTxMsg(msg, toWs)
 
 
-def main():
+def main(wsAddr="0.0.0.0", wsPort=WS_SERVER_PORT_DEFAULT):
     """Initialize websocket serving server and load plugins"""
-    wsServer = websockets.serve(rxClient, "0.0.0.0", 4000)
+    print("Starting server. Listening on", wsAddr, "port", wsPort)
+    wsServer = websockets.serve(rxClient, wsAddr, wsPort)
 
     asyncio.get_event_loop().create_task(giTxQueue(txQueue()))
 
