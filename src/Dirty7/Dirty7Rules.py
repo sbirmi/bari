@@ -83,15 +83,15 @@ class SameRank(MoveProcessor):
             return None
 
         # Can draw only 1 card
-        if numDrawCards != 1:
-            trace(Level.debug, "Must draw a card or pick a card")
+        if numDrawCards != 1 and len(pickCards) == 0:
+            trace(Level.debug, "Must draw only 1 card")
             return None
 
         tableCards = round_.tableCards
 
         # pickCards must be of length 1 and be visible
-        if len(pickCards) == 1:
-            trace(Level.debug, "Can only pick 1 card")
+        if numDrawCards == 0 and len(pickCards) > 1:
+            trace(Level.debug, "Must pick only 1 card")
             return None
 
         ## The move is valid. Make it happen
