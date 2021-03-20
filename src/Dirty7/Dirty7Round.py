@@ -119,9 +119,9 @@ class Round:
             scorePlayers[score].add(name)
 
         if uniqueScores[0] < event.score or len(scorePlayers[event.score]) > 1:
-            for name in playerScores[uniqueScores[0]]:
+            for name in scorePlayers[uniqueScores[0]]:
                 playerScores[name] = 0
-            playerScores[event.name] = self.roundParams.penaltyPoints
+            playerScores[event.player.name] = self.roundParams.penaltyPoints
         else:
             playerScores[event.player.name] = 0
 
