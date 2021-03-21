@@ -280,6 +280,65 @@ class Dirty7RoomTest(unittest.TestCase, MsgTestLib):
                                               {ws10}),
                                  ], anyOrder=True)
 
+    def testDirty7RoomDeclareGetsPenalty(self):
+        env = self.setUpDirty7Room()
+        self.drainGiTxQueue(env.txq)
+
+        turnPlayerName = env.room.rounds[-1].turn.playerNameInTurnOrder[0]
+        otherPlayerName = env.room.rounds[-1].turn.playerNameInTurnOrder[1]
+        turnWs = env.ws1 if turnPlayerName == "plyr1" else env.ws2
+        turnPrs = env.room.rounds[-1].playerRoundStatus[turnPlayerName]
+        otherPrs = env.room.rounds[-1].playerRoundStatus[otherPlayerName]
+
+        # Initial cards
+        turnPrs.hand.setCards([Card.Card(Card.SPADES, 4)])
+        otherPrs.hand.setCards([Card.Card(Card.SPADES, 2)])
+
+        self.assertGiTxQueueMsgs(env.txq, [ClientTxMsg(['PLAYER-CARDS', 1, 'plyr2', 1],
+                                                       {env.ws1, env.ws2}),
+                                           ClientTxMsg(['PLAYER-CARDS', 1, 'plyr2', 1,
+                                                        [['S', 4]]],
+                                                       {env.ws2}),
+                                           ClientTxMsg(['PLAYER-CARDS', 1, 'plyr1', 1],
+                                                       {env.ws1, env.ws2}),
+                                           ClientTxMsg(['PLAYER-CARDS', 1, 'plyr1', 1,
+                                                        [['S', 2]]],
+                                                       {env.ws1}),
+                                          ])
+        env.room.processMsg(ClientRxMsg(["DECLARE"], initiatorWs=turnWs))
+        self.assertGiTxQueueMsgs(env.txq, [ClientTxMsg(['UPDATE', 1, {'DECLARE': ['plyr2', 4]}],
+                                                       {env.ws1, env.ws2}),
+                                           ClientTxMsg(['ROUND-SCORE', 1, {'plyr1': 0, 'plyr2': 40}],
+                                                       {env.ws1, env.ws2}),
+                                           ClientTxMsg(['PLAYER-CARDS', 1, 'plyr1', 1, [['S', 2]]],
+                                                       {env.ws1, env.ws2}),
+                                           ClientTxMsg(['PLAYER-CARDS', 1, 'plyr2', 1, [['S', 4]]],
+                                                       {env.ws1, env.ws2}),
+                                           ClientTxMsg(['TURN-ORDER', 2, ['plyr2', 'plyr1']],
+                                                       {env.ws1, env.ws2}),
+                                           ClientTxMsg(['TURN', 2, 'plyr1'],
+                                                       {env.ws1, env.ws2}),
+                                           ClientTxMsg(['ROUND-SCORE', 2, {'plyr1': None, 'plyr2': None}],
+                                                       {env.ws1, env.ws2}),
+                                           ClientTxMsg(['PLAYER-CARDS', 2, 'plyr1', 7],
+                                                       {env.ws1, env.ws2}),
+                                           ClientTxMsg(['PLAYER-CARDS', 2, 'plyr1', 7, [['D', 4], ['C', 12], ['D', 6], ['D', 12], ['H', 2], ['H', 9], ['C', 9]]],
+                                                       {env.ws1}),
+                                           ClientTxMsg(['PLAYER-CARDS', 2, 'plyr2', 7],
+                                                       {env.ws1, env.ws2}),
+                                           ClientTxMsg(['PLAYER-CARDS', 2, 'plyr2', 7, [['H', 5], ['D', 7], ['D', 11], ['C', 1], ['D', 13], ['JOKER', 0], ['C', 5]]],
+                                                       {env.ws2}),
+                                           ClientTxMsg(['TABLE-CARDS', 2, 90, 0, [['H', 4]]],
+                                                       {env.ws1, env.ws2}),
+                                           InternalGiStatus([{'gameState': 'PlayerTurn',
+                                                              'clientCount': {'plyr1': 1,
+                                                                              'plyr2': 1},
+                                                              'spectatorCount': 0},
+                                                              0, env.hostParameters.state,
+                                                              2, env.hostParameters.state,
+                                                            ], "dirty7:1"),
+                                          ])
+
     def testDirty7RoomBadMoves(self):
         env = self.setUpDirty7Room()
         self.drainGiTxQueue(env.txq)
