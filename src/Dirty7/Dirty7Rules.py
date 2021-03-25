@@ -19,7 +19,8 @@ from fwk.Trace import (
 # Move validators and processors
 
 class MoveProcessor:
-    ruleName = None
+    def __init__(self, ruleName):
+        self.ruleName = ruleName
 
     def makePlay(self, tableCards, playerHand, dropCards, numDrawCards, pickCards):
         gainCards = tableCards.delta(dropCards, pickCards, numDrawCards)
@@ -31,12 +32,11 @@ class MoveProcessor:
         """
         raise NotImplementedError
 
-
-class SameRank(MoveProcessor):
+class SameRankMove(MoveProcessor):
     """Allows the play of 1 or more cards of the same rank"""
-    ruleName = "SameRank"
 
     def __init__(self, minCardCount=1, maxCardCount=None):
+        super(SameRankMove, self).__init__("SameRankMove")
         self.minCardCount = minCardCount
         self.maxCardCount = maxCardCount
 
@@ -54,6 +54,82 @@ class SameRank(MoveProcessor):
         # All dropCards should have the same rank
         if len(set(card.rank for card in dropCards)) > 1:
             trace(Level.debug, "All cards must have the same rank")
+            return None
+
+        playerRoundStatus = round_.playerRoundStatus[player.name]
+        if not playerRoundStatus.hand.contains(dropCards):
+            trace(Level.debug, "Playing cards not in the hand {}".format(list(map(str, dropCards))))
+            return None
+
+        # self.minCardCount .. self.maxCardCount check
+        dropCardCount = len(dropCards)
+
+        if self.minCardCount is not None and dropCardCount < self.minCardCount:
+            trace(Level.debug, "Must drop at least {} cards".format(self.minCardCount))
+            return None
+
+        if self.maxCardCount is not None and dropCardCount > self.maxCardCount:
+            trace(Level.debug, "Can drop at most {} cards".format(self.maxCardCount))
+            return None
+
+        # Can't pick and draw at the same time
+        if numDrawCards > 0 and len(pickCards) > 0:
+            trace(Level.debug, "Can't draw cards and pick cards at the same time")
+            return None
+
+        # Must pick or draw a card
+        if numDrawCards == 0 and pickCards == []:
+            trace(Level.debug, "Must draw a card or pick a card")
+            return None
+
+        # Can draw only 1 card
+        if numDrawCards != 1 and len(pickCards) == 0:
+            trace(Level.debug, "Must draw only 1 card")
+            return None
+
+        tableCards = round_.tableCards
+
+        # pickCards must be of length 1 and be visible
+        if numDrawCards == 0 and len(pickCards) > 1:
+            trace(Level.debug, "Must pick only 1 card")
+            return None
+
+        ## The move is valid. Make it happen
+
+        self.makePlay(tableCards, playerRoundStatus.hand, dropCards, numDrawCards, pickCards)
+
+        return AdvanceTurn(1)
+
+class SeqMove(MoveProcessor):
+    """Allows the play of sequence of cards. The sequence must be
+    of length minCardCount..maxCardCount
+    """
+    def __init__(self, minCardCount=1, maxCardCount=None):
+        super(SeqMove, self).__init__("SeqMove[{},{}]".format(minCardCount, maxCardCount))
+        self.minCardCount = minCardCount
+        self.maxCardCount = maxCardCount
+
+    def processPlay(self, round_, player, dropCards, numDrawCards, pickCards):
+        trace(Level.play, self.ruleName, "player", player.name,
+              "dropCards", list(map(str, dropCards)),
+              "numDrawCards", numDrawCards,
+              "pickCards", list(map(str, pickCards)))
+
+        # Must drop at least one card
+        if not dropCards:
+            trace(Level.debug, "Must drop some cards")
+            return None
+
+        # Cards played must have exactly 1 card of each rank
+        ranksSeen = [card.rank for card in dropCards]
+        if len(ranksSeen) != len(set(ranksSeen)):
+            trace(Level.debug, "Duplicate cards played")
+            return None
+
+        # Ensure the cards are in a sequence
+        ranksSeen = sorted(ranksSeen)
+        if ranksSeen != list(range(ranksSeen[0], ranksSeen[0] + len(ranksSeen))):
+            trace(Level.debug, "Cards not in a sequence")
             return None
 
         playerRoundStatus = round_.playerRoundStatus[player.name]
@@ -191,12 +267,20 @@ class Basic(RuleEngine):
         RuleEngine.__init__(self, "basic", "Basic rules",
                             moveProcessorList)
 
-class Seq3(RuleEngine):
+class BasicSeq3(RuleEngine):
     def __init__(self, moveProcessorList):
-        RuleEngine.__init__(self, "basic", "Basic rules",
+        RuleEngine.__init__(self, "basic+seq3", "Basic + sequence of 3 rules",
+                            moveProcessorList)
+
+class BasicSeq3Plus(RuleEngine):
+    def __init__(self, moveProcessorList):
+        RuleEngine.__init__(self, "basic+seq3plus", "Basic + sequence of 3 or more rules",
                             moveProcessorList)
 
 SupportedRules = {re.shortName: re for re in
-                  (Basic([SameRank()]),
-                   Seq3([SameRank()]),
+                  (Basic([SameRankMove()]),
+                   BasicSeq3([SameRankMove(),
+                              SeqMove(minCardCount=3, maxCardCount=3)]),
+                   BasicSeq3Plus([SameRankMove(),
+                                  SeqMove(minCardCount=3, maxCardCount=None)]),
                   )}
