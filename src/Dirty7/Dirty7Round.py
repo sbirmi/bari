@@ -156,28 +156,36 @@ class RoundParameters:
             raise InvalidDataException("Invalid names of rules", ruleNames)
 
         if not numDecks in {1, 2}:
-            raise InvalidDataException("Invalid number of decks", numDecks)
+            raise InvalidDataException("Invalid number of decks. Must be 1 or 2", numDecks)
 
-        if not numJokers in range(2 * numDecks):
-            raise InvalidDataException("Invalid number of jokers", numJokers)
+        maxJokers = 2 * numDecks
+        if not numJokers in range(maxJokers + 1):
+            raise InvalidDataException("Invalid number of jokers. "
+                                       "Must be between 0..{}".format(maxJokers),
+                                       numJokers)
 
         if not numPlayers in range(1, 9):
-            raise InvalidDataException("Invalid number of players", numPlayers)
+            raise InvalidDataException("Invalid number of players. Must be between 1..8",
+                                       numPlayers)
 
         if numCardsToStart not in range(3, 14):
-            raise InvalidDataException("Invalid number of cards to deal", numCardsToStart)
+            raise InvalidDataException("Invalid number of cards to deal. Must be between 3..13",
+                                       numCardsToStart)
 
         if numCardsToStart * numPlayers + 1 >= numDecks * 52 + numJokers:
-            raise InvalidDataException("Too many cards to deal", numCardsToStart)
+            raise InvalidDataException("Not enough cards to deal to each player", numCardsToStart)
 
         if not isinstance(declareMaxPoints, int) or declareMaxPoints <= 0:
-            raise InvalidDataException("Invalid declareMaxPoints", declareMaxPoints)
+            raise InvalidDataException("Invalid points for declaring. Must be greater than 0",
+                                       declareMaxPoints)
 
         if not isinstance(penaltyPoints, int) or penaltyPoints < 20:
-            raise InvalidDataException("Invalid penalty points or too low", penaltyPoints)
+            raise InvalidDataException("Invalid penalty points. Must be greater than equal to 20",
+                                       penaltyPoints)
 
         if not isinstance(stopPoints, int) or stopPoints < 0:
-            raise InvalidDataException("Invalid stopPoints", stopPoints)
+            raise InvalidDataException("Invalid stopPoints. Most be greater than equal to 0",
+                                       stopPoints)
 
         self.state = Map(ruleNames=ruleNames,
                          numPlayers=numPlayers,
