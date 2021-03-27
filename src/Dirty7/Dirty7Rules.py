@@ -263,24 +263,38 @@ class RuleEngine:
 ###########################################################
 
 class Basic(RuleEngine):
-    def __init__(self, moveProcessorList):
+    def __init__(self):
         RuleEngine.__init__(self, "basic", "Basic rules",
-                            moveProcessorList)
+                            [SameRankMove()])
 
 class BasicSeq3(RuleEngine):
-    def __init__(self, moveProcessorList):
+    def __init__(self):
         RuleEngine.__init__(self, "basic+seq3", "Basic + sequence of 3 rules",
-                            moveProcessorList)
+                            [SameRankMove(),
+                             SeqMove(minCardCount=3, maxCardCount=3)])
 
 class BasicSeq3Plus(RuleEngine):
-    def __init__(self, moveProcessorList):
+    def __init__(self):
         RuleEngine.__init__(self, "basic+seq3plus", "Basic + sequence of 3 or more rules",
-                            moveProcessorList)
+                            [SameRankMove(),
+                             SeqMove(minCardCount=3, maxCardCount=None)])
+
+class Seq3(RuleEngine):
+    def __init__(self):
+        RuleEngine.__init__(self, "seq3", "Sequence of 3 rules",
+                            [SameRankMove(maxCardCount=1),
+                             SeqMove(minCardCount=3, maxCardCount=3)])
+
+class Seq3Plus(RuleEngine):
+    def __init__(self):
+        RuleEngine.__init__(self, "seq3plus", "Sequence of 3 or more rules",
+                            [SameRankMove(maxCardCount=1),
+                             SeqMove(minCardCount=3, maxCardCount=None)])
 
 SupportedRules = {re.shortName: re for re in
-                  (Basic([SameRankMove()]),
-                   BasicSeq3([SameRankMove(),
-                              SeqMove(minCardCount=3, maxCardCount=3)]),
-                   BasicSeq3Plus([SameRankMove(),
-                                  SeqMove(minCardCount=3, maxCardCount=None)]),
+                  (Basic(),
+                   BasicSeq3(),
+                   BasicSeq3Plus(),
+                   Seq3(),
+                   Seq3Plus(),
                   )}
