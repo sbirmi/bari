@@ -53,7 +53,7 @@ class Dirty7Room(GamePlugin):
     """
     When a websocket has connected but hasn't joined:
         playerByWs[ws] == None
-    As soon as the websocket sends a vailid JOIN message,
+    As soon as the websocket sends a valid JOIN message,
         playerByWs[ws] == Player(..)
     """
     def __init__(self, path, name, hostParameters):

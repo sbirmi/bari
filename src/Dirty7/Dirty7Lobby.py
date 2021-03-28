@@ -18,7 +18,7 @@ class Dirty7Lobby(GameLobbyPlugin):
 
     def processHost(self, qmsg):
         try:
-            roundParameters = RoundParameters.fromJmsg(qmsg.jmsg)
+            hostParameters = RoundParameters.fromJmsg(qmsg.jmsg)
         except InvalidDataException as exc:
             self.txQueue.put_nowait(ClientTxMsg(
                 [MTYPE_HOST_BAD] + exc.toJmsg(), {qmsg.initiatorWs},
@@ -28,7 +28,7 @@ class Dirty7Lobby(GameLobbyPlugin):
         self.gameIdx += 1
         newRoom = Dirty7Room("dirty7:{}".format(self.gameIdx),
                              "Dirty7 Room #{}".format(self.gameIdx),
-                             roundParameters)
+                             hostParameters)
         self.rooms[self.gameIdx] = newRoom
 
         self.txQueue.put_nowait(InternalRegisterGi(newRoom, initiatorWs=qmsg.initiatorWs))

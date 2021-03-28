@@ -74,7 +74,6 @@ class Dirty7RoomTest(unittest.TestCase, MsgTestLib):
         round_ = Dirty7Round.Round("dirty7:1", conns, roundParameters,
                                    playerByName, turn)
 
-        # pylint: disable=bad-continuation
         self.assertGiTxQueueMsgs(txq,
             [ClientTxMsg(["TURN-ORDER", 1, ['foo', 'bar']], {1, 2}),
              ClientTxMsg(["TURN", 1, 'foo'], {1, 2}),
@@ -88,6 +87,16 @@ class Dirty7RoomTest(unittest.TestCase, MsgTestLib):
              ClientTxMsg(["PLAYER-CARDS", 1, "bar", 7, [['S', 13], ['D', 2], ['C', 3],
                                                         ['S', 8], ['C', 13], ['H', 7],
                                                         ['C', 4]]], {2}),
+             ClientTxMsg(['ROUND-PARAMETERS', 1,
+                          {'ruleNames': ['basic'],
+                           'numPlayers': 2,
+                           'numDecks': 2,
+                           'numJokers': 1,
+                           'numCardsToStart': 7,
+                           'declareMaxPoints': 7,
+                           'penaltyPoints': 40,
+                           'stopPoints': 100}],
+                          {1, 2}),
             ], anyOrder=True)
 
     def testDirty7RoomGameOver(self):
@@ -150,6 +159,16 @@ class Dirty7RoomTest(unittest.TestCase, MsgTestLib):
                                                     1, env.hostParameters.state],
                                                    "dirty7:1"),
                                   ClientTxMsg(['GAME-OVER', ['plyr2']], {ws10}),
+                                  ClientTxMsg(['ROUND-PARAMETERS', 1,
+                                               {'ruleNames': ['basic'],
+                                                'numPlayers': 2,
+                                                'numDecks': 2,
+                                                'numJokers': 1,
+                                                'numCardsToStart': 7,
+                                                'declareMaxPoints': 7,
+                                                'penaltyPoints': 40,
+                                                'stopPoints': 30}],
+                                               {ws10}),
                                  ], anyOrder=True)
 
         # Have the spectator join and see what messages are created
@@ -229,6 +248,16 @@ class Dirty7RoomTest(unittest.TestCase, MsgTestLib):
                                                              0, env.hostParameters.state,
                                                              2, env.hostParameters.state],
                                                             "dirty7:1"),
+                                           ClientTxMsg(['ROUND-PARAMETERS', 2,
+                                                        {'ruleNames': ['basic'],
+                                                         'numPlayers': 2,
+                                                         'numDecks': 2,
+                                                         'numJokers': 1,
+                                                         'numCardsToStart': 7,
+                                                         'declareMaxPoints': 7,
+                                                         'penaltyPoints': 40,
+                                                         'stopPoints': 100}],
+                                                        {env.ws1, env.ws2}),
                                           ], anyOrder=True)
 
         # Add a new player (as spectator) and see what messages are created
@@ -263,6 +292,26 @@ class Dirty7RoomTest(unittest.TestCase, MsgTestLib):
                                                     0, env.hostParameters.state,
                                                     2, env.hostParameters.state],
                                                    "dirty7:1"),
+                                  ClientTxMsg(['ROUND-PARAMETERS', 1,
+                                               {'ruleNames': ['basic'],
+                                                'numPlayers': 2,
+                                                'numDecks': 2,
+                                                'numJokers': 1,
+                                                'numCardsToStart': 7,
+                                                'declareMaxPoints': 7,
+                                                'penaltyPoints': 40,
+                                                'stopPoints': 100}],
+                                               {ws10}),
+                                  ClientTxMsg(['ROUND-PARAMETERS', 2,
+                                               {'ruleNames': ['basic'],
+                                                'numPlayers': 2,
+                                                'numDecks': 2,
+                                                'numJokers': 1,
+                                                'numCardsToStart': 7,
+                                                'declareMaxPoints': 7,
+                                                'penaltyPoints': 40,
+                                                'stopPoints': 100}],
+                                               {ws10}),
                                  ], anyOrder=True)
 
         # Have the spectator join and see what messages are created
@@ -308,7 +357,8 @@ class Dirty7RoomTest(unittest.TestCase, MsgTestLib):
         env.room.processMsg(ClientRxMsg(["DECLARE"], initiatorWs=turnWs))
         self.assertGiTxQueueMsgs(env.txq, [ClientTxMsg(['UPDATE', 1, {'DECLARE': ['plyr2', 4]}],
                                                        {env.ws1, env.ws2}),
-                                           ClientTxMsg(['ROUND-SCORE', 1, {'plyr1': 0, 'plyr2': 40}],
+                                           ClientTxMsg(['ROUND-SCORE', 1, {'plyr1': 0,
+                                                                           'plyr2': 40}],
                                                        {env.ws1, env.ws2}),
                                            ClientTxMsg(['PLAYER-CARDS', 1, 'plyr1', 1, [['S', 2]]],
                                                        {env.ws1, env.ws2}),
@@ -318,15 +368,20 @@ class Dirty7RoomTest(unittest.TestCase, MsgTestLib):
                                                        {env.ws1, env.ws2}),
                                            ClientTxMsg(['TURN', 2, 'plyr1'],
                                                        {env.ws1, env.ws2}),
-                                           ClientTxMsg(['ROUND-SCORE', 2, {'plyr1': None, 'plyr2': None}],
+                                           ClientTxMsg(['ROUND-SCORE', 2, {'plyr1': None,
+                                                                           'plyr2': None}],
                                                        {env.ws1, env.ws2}),
                                            ClientTxMsg(['PLAYER-CARDS', 2, 'plyr1', 7],
                                                        {env.ws1, env.ws2}),
-                                           ClientTxMsg(['PLAYER-CARDS', 2, 'plyr1', 7, [['D', 4], ['C', 12], ['D', 6], ['D', 12], ['H', 2], ['H', 9], ['C', 9]]],
+                                           ClientTxMsg(['PLAYER-CARDS', 2, 'plyr1', 7,
+                                                        [['D', 4], ['C', 12], ['D', 6], ['D', 12],
+                                                         ['H', 2], ['H', 9], ['C', 9]]],
                                                        {env.ws1}),
                                            ClientTxMsg(['PLAYER-CARDS', 2, 'plyr2', 7],
                                                        {env.ws1, env.ws2}),
-                                           ClientTxMsg(['PLAYER-CARDS', 2, 'plyr2', 7, [['H', 5], ['D', 7], ['D', 11], ['C', 1], ['D', 13], ['JOKER', 0], ['C', 5]]],
+                                           ClientTxMsg(['PLAYER-CARDS', 2, 'plyr2', 7,
+                                                        [['H', 5], ['D', 7], ['D', 11], ['C', 1],
+                                                         ['D', 13], ['JOKER', 0], ['C', 5]]],
                                                        {env.ws2}),
                                            ClientTxMsg(['TABLE-CARDS', 2, 90, 0, [['H', 4]]],
                                                        {env.ws1, env.ws2}),
@@ -337,7 +392,17 @@ class Dirty7RoomTest(unittest.TestCase, MsgTestLib):
                                                               0, env.hostParameters.state,
                                                               2, env.hostParameters.state,
                                                             ], "dirty7:1"),
-                                          ])
+                                           ClientTxMsg(['ROUND-PARAMETERS', 2,
+                                                        {'ruleNames': ['basic'],
+                                                         'numPlayers': 2,
+                                                         'numDecks': 2,
+                                                         'numJokers': 1,
+                                                         'numCardsToStart': 7,
+                                                         'declareMaxPoints': 7,
+                                                         'penaltyPoints': 40,
+                                                         'stopPoints': 100}],
+                                                        {env.ws1, env.ws2}),
+                                          ], anyOrder=True)
 
     def testDirty7RoomBadMoves(self):
         env = self.setUpDirty7Room()
@@ -400,6 +465,16 @@ class Dirty7RoomTest(unittest.TestCase, MsgTestLib):
                                            ClientTxMsg(['TURN-ORDER', 1, ['plyr2', 'plyr1']],
                                                        {env.ws1, env.ws2}),
                                            ClientTxMsg(['TURN', 1, 'plyr2'], {env.ws1, env.ws2}),
+                                           ClientTxMsg(['ROUND-PARAMETERS', 1,
+                                                        {'ruleNames': ['basic'],
+                                                         'numPlayers': 2,
+                                                         'numDecks': 2,
+                                                         'numJokers': 1,
+                                                         'numCardsToStart': 7,
+                                                         'declareMaxPoints': 7,
+                                                         'penaltyPoints': 40,
+                                                         'stopPoints': 100}],
+                                                        {env.ws1, env.ws2}),
                                            ClientTxMsg(['ROUND-SCORE', 1,
                                                         {'plyr1': None, 'plyr2': None}],
                                                        {env.ws1, env.ws2}),
@@ -436,7 +511,8 @@ class Dirty7RoomTest(unittest.TestCase, MsgTestLib):
                                                                                {'AdvanceTurn': 1}]}
                                                        ], {env.ws1, env.ws2}),
                                            ClientTxMsg(['TURN', 1, 'plyr1'], {env.ws1, env.ws2}),
-                                          ])
+                                          ],
+                                          anyOrder=True)
 
     def testDirty7RoomConnectThenJoin(self):
         rxq = asyncio.Queue()
@@ -499,7 +575,17 @@ class Dirty7RoomTest(unittest.TestCase, MsgTestLib):
                                                          0, hostParameters.state,
                                                          1, hostParameters.state],
                                                         "dirty7:1"),
-                                      ])
+                                       ClientTxMsg(['ROUND-PARAMETERS', 1,
+                                                    {'ruleNames': ['basic'],
+                                                     'numPlayers': 2,
+                                                     'numDecks': 2,
+                                                     'numJokers': 1,
+                                                     'numCardsToStart': 7,
+                                                     'declareMaxPoints': 7,
+                                                     'penaltyPoints': 40,
+                                                     'stopPoints': 100}],
+                                                    {1, 2}),
+                                      ], anyOrder=True)
 
 class PlayerHandTest(unittest.TestCase, MsgTestLib):
     def testContains(self):

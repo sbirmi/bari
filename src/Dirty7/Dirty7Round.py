@@ -74,8 +74,7 @@ class Round:
         self.turn = turn
         self.isRoundOver = isRoundOver
 
-        self.roundScore = RoundScore(conns, roundParams.roundNum,
-                                     {name: None for name in self.playerByName})
+        self.roundParametersAnnouncer = RoundParametersAnnouncer(conns, roundParams)
 
         deckCards = roundParams.createStartingCards()
 
@@ -93,6 +92,9 @@ class Round:
         self.tableCards = TableCards(conns, roundParams.roundNum,
                                      deckCards=deckCards,
                                      revealedCards=revealedCards)
+
+        self.roundScore = RoundScore(conns, roundParams.roundNum,
+                                     {name: None for name in self.playerByName})
 
         self.rule = SupportedRules[next(iter(roundParams.state.ruleNames))]
 
@@ -151,7 +153,6 @@ class RoundParameters:
         self.roundNum = roundNum
 
         if (not isinstance(ruleNames, (list, set)) or
-                len(ruleNames) != 1 or
                 next(iter(ruleNames)) not in SupportedRules):
             raise InvalidDataException("Invalid names of rules", ruleNames)
 
@@ -195,7 +196,12 @@ class RoundParameters:
                          declareMaxPoints=declareMaxPoints,
                          penaltyPoints=penaltyPoints,
                          stopPoints=stopPoints)
-        self.ruleEngine = SupportedRules[next(iter(ruleNames))]
+
+        if self.roundNum == 0:
+            self.ruleEngine = None
+        else:
+            assert len(ruleNames) == 1
+            self.ruleEngine = SupportedRules[next(iter(ruleNames))]
 
     def __getattr__(self, name):
         return getattr(self.state, name)
@@ -229,6 +235,13 @@ class RoundParameters:
         cards.extend([Card(JOKER, 0) for _ in range(self.numJokers)])
         random.shuffle(cards)
         return cards
+
+class RoundParametersAnnouncer(MsgSrc):
+    """Tracks the parameters of the current round"""
+    def __init__(self, conns, roundParameters):
+        MsgSrc.__init__(self, conns)
+        self.roundParameters = roundParameters
+        self.setMsgs([Jmai(["ROUND-PARAMETERS"] + roundParameters.toJmsg(), None)])
 
 class RoundScore(MsgSrc):
     """Tracks the score of all players at the end of the round"""
