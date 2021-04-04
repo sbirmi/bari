@@ -269,13 +269,13 @@ class Basic(RuleEngine):
 
 class BasicSeq3(RuleEngine):
     def __init__(self):
-        RuleEngine.__init__(self, "basic+seq3", "Basic + sequence of 3 rules",
+        RuleEngine.__init__(self, "basic,seq3", "Basic + sequence of 3 rules",
                             [SameRankMove(),
                              SeqMove(minCardCount=3, maxCardCount=3)])
 
 class BasicSeq3Plus(RuleEngine):
     def __init__(self):
-        RuleEngine.__init__(self, "basic+seq3plus", "Basic + sequence of 3 or more rules",
+        RuleEngine.__init__(self, "basic,seq3+", "Basic + sequence of 3 or more rules",
                             [SameRankMove(),
                              SeqMove(minCardCount=3, maxCardCount=None)])
 
@@ -287,7 +287,7 @@ class Seq3(RuleEngine):
 
 class Seq3Plus(RuleEngine):
     def __init__(self):
-        RuleEngine.__init__(self, "seq3plus", "Sequence of 3 or more rules",
+        RuleEngine.__init__(self, "seq3+", "Sequence of 3 or more rules",
                             [SameRankMove(maxCardCount=1),
                              SeqMove(minCardCount=3, maxCardCount=None)])
 
