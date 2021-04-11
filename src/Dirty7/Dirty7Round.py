@@ -26,6 +26,7 @@ from Dirty7.Card import (
 from Dirty7.Dirty7Rules import (
         SupportedRules,
         SupportedDeclareCutoffs,
+        SupportedScoringSystems,
 )
 from Dirty7.Exceptions import InvalidDataException
 
@@ -88,7 +89,8 @@ class Round:
                 conns,
                 roundParams.roundNum,
                 player,
-                handCards)
+                handCards,
+                SupportedScoringSystems[roundParams.scoringSystems[0]])
 
         revealedCards = [deckCards.pop()]
 
@@ -140,7 +142,9 @@ class RoundParameters:
                "numCardsToStart",
                "declareMaxPoints",
                "penaltyPoints",
-               "stopPoints")
+               "stopPoints",
+               "scoringSystems",
+              )
 
     def __init__(self,
                  ruleNames,
@@ -151,13 +155,17 @@ class RoundParameters:
                  declareMaxPoints,
                  penaltyPoints,
                  stopPoints,
+                 scoringSystems,
                  roundNum=0):
         self.msgSrc = None
         self.roundNum = roundNum
 
-        if (not isinstance(ruleNames, (list, set)) or
-                next(iter(ruleNames)) not in SupportedRules):
-            raise InvalidDataException("Invalid names of rules", ruleNames)
+        if not isinstance(ruleNames, list) or not ruleNames:
+            raise InvalidDataException("Invalid choices for rule names. Must be a list of choices",
+                                       ruleNames)
+
+        if not set(ruleNames).issubset(set(SupportedRules)):
+            raise InvalidDataException("Unrecognized rule names", ruleNames)
 
         if not numDecks in {1, 2}:
             raise InvalidDataException("Invalid number of decks. Must be 1 or 2", numDecks)
@@ -184,8 +192,7 @@ class RoundParameters:
                                        declareMaxPoints)
 
         if not set(declareMaxPoints).issubset(SupportedDeclareCutoffs):
-            raise InvalidDataException("Invalid choices for declaring. Must be a list of choices",
-                                       declareMaxPoints)
+            raise InvalidDataException("Unrecognized declare cut-off", declareMaxPoints)
 
         if not isinstance(penaltyPoints, int) or penaltyPoints < 20:
             raise InvalidDataException("Invalid penalty points. Must be greater than equal to 20",
@@ -195,6 +202,13 @@ class RoundParameters:
             raise InvalidDataException("Invalid stopPoints. Most be greater than equal to 0",
                                        stopPoints)
 
+        if not isinstance(scoringSystems, list) or not scoringSystems:
+            raise InvalidDataException("Invalid choices for scoring systems. Must be a list of choices",
+                                       scoringSystems)
+
+        if not set(scoringSystems).issubset(set(SupportedScoringSystems)):
+            raise InvalidDataException("Unrecognized scoring systems provided", scoringSystems)
+
         self.state = Map(ruleNames=ruleNames,
                          numPlayers=numPlayers,
                          numDecks=numDecks,
@@ -202,7 +216,8 @@ class RoundParameters:
                          numCardsToStart=numCardsToStart,
                          declareMaxPoints=declareMaxPoints,
                          penaltyPoints=penaltyPoints,
-                         stopPoints=stopPoints)
+                         stopPoints=stopPoints,
+                         scoringSystems=scoringSystems)
 
         if self.roundNum == 0:
             self.ruleEngine = None
@@ -335,7 +350,7 @@ class TableCards(CardGroupBase):
         return None
 
 class PlayerRoundStatus:
-    def __init__(self, conns, roundNum, player, handCards):
+    def __init__(self, conns, roundNum, player, handCards, scoringSystem):
         self.conns = conns
         self.roundNum = roundNum
         self.player = player
@@ -343,20 +358,23 @@ class PlayerRoundStatus:
                                self.player.playerConns,
                                roundNum,
                                self.player.name,
-                               handCards)
+                               handCards,
+                               scoringSystem)
 
 class PlayerHand(CardGroupBase):
     def __init__(self, conns, playerConns, roundNum, playerName, cards,
+                 scoringSystem,
                  isRoundOver=False):
         self.roundNum = roundNum
         self.playerName = playerName
         self.cards = None
+        self.scoringSystem = scoringSystem
         self.isRoundOver = isRoundOver
         CardGroupBase.__init__(self, conns, playerConns)
         self.setCards(cards)
 
     def score(self, rule):
-        return sum(rule.cardPoints(cd) for cd in self.cards)
+        return self.scoringSystem.score(self.cards)
 
     def setCards(self, cards):
         self.cards = cards

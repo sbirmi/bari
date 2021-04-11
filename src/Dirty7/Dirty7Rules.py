@@ -18,6 +18,51 @@ from fwk.Trace import (
         trace,
 )
 
+
+###########################################################
+# Scoring systems
+
+class ScoringSystem:
+    def __init__(self, name):
+        self.name = name
+
+    def score(self, cards):
+        raise NotImplementedError
+
+class StandardScoringSystem(ScoringSystem):
+    """
+    "standard" - joker 0, j/q/k=10, other have face value
+    """
+    def __init__(self):
+        super(StandardScoringSystem, self).__init__("standard")
+
+    def cardPoints(self, card):
+        return min(card.rank, 10)
+
+    def score(self, cards):
+        return sum(self.cardPoints(cd) for cd in cards)
+
+class Heart1ScoringSystem(ScoringSystem):
+    """
+    "heart-1" - joker 0, hearts = 1, others have standard
+    """
+    def __init__(self):
+        super(Heart1ScoringSystem, self).__init__("heart-1")
+
+    def cardPoints(self, card):
+        if (card.suit == Card.HEARTS):
+            return 1
+        return min(card.rank, 10)
+
+    def score(self, cards):
+        return sum(self.cardPoints(cd) for cd in cards)
+
+SupportedScoringSystems = {
+        scoringSys.name: scoringSys for scoringSys in (
+            StandardScoringSystem(),
+            Heart1ScoringSystem(),
+        )}
+
 ###########################################################
 # Move validators and processors
 
@@ -172,9 +217,6 @@ class RuleEngine:
         self.name = name
         self.moveProcessorList = moveProcessorList
 
-    def cardPoints(self, card):
-        return min(card.rank, 10)
-
     def makeRoundParameters(self, hostParams, roundNum):
         roundParameters = Dirty7Round.RoundParameters(
             [self.shortName],
@@ -185,6 +227,7 @@ class RuleEngine:
             [random.choice(hostParams.state.declareMaxPoints)],
             hostParams.state.penaltyPoints,
             hostParams.state.stopPoints,
+            [random.choice(hostParams.scoringSystems)],
             roundNum=roundNum)
         return roundParameters
 
@@ -227,18 +270,11 @@ class RuleEngine:
 
         return None
 
-#* ruleSet = subset from
-#     {"random",
-#      "basic",
+# pending rule ideas
+#     {
 #      "basic-10card",
 #      "pick-any",
-#      "seq3",
-#      "seq3+",
-#      "declare-any",
-#      "hearts-1",
-#      "one-or-seq3",
-#      "one-or-seq3+",
-#      "flush4"}
+#     }
 
 ###########################################################
 
@@ -295,6 +331,8 @@ class Suit3Plus(RuleEngine):
                             [SameRankMove(maxCardCount=1),
                              SameSuitMove(minCardCount=3, maxCardCount=None)])
 
+# Consider these static. These are defined once and used across all games.
+# Don't put game or round specific details in them
 SupportedRules = {re.shortName: re for re in
                   (Basic(),
                    BasicSeq3(),
