@@ -4,6 +4,8 @@ data should be passed in to methods but
 not retained locally.
 """
 
+import random
+
 from Dirty7 import Card
 from Dirty7 import Dirty7Round
 from Dirty7.Events import (
@@ -180,7 +182,7 @@ class RuleEngine:
             hostParams.state.numDecks,
             hostParams.state.numJokers,
             hostParams.state.numCardsToStart,
-            hostParams.state.declareMaxPoints,
+            [random.choice(hostParams.state.declareMaxPoints)],
             hostParams.state.penaltyPoints,
             hostParams.state.stopPoints,
             roundNum=roundNum)
@@ -198,8 +200,8 @@ class RuleEngine:
         playerHand = playerRoundStatus.hand
         handScore = playerHand.score(self)
 
-        if (roundParams.declareMaxPoints and
-                handScore > roundParams.declareMaxPoints):
+        if (roundParams.declareMaxPoints[0] and
+                handScore > roundParams.declareMaxPoints[0]):
             trace(Level.info, "Declaring with", handScore, "points >",
                   roundParams.declareMaxPoints, "points.",
                   [str(cd) for cd in playerHand.cards])
@@ -304,3 +306,13 @@ SupportedRules = {re.shortName: re for re in
                    Suit3(),
                    Suit3Plus(),
                   )}
+
+
+###########################################################
+# Declare point cut-offs
+#
+# 1. None means no cut-off
+# 2. <int> means declare is allowed at or under the integer
+#    value
+
+SupportedDeclareCutoffs = {None, 7}

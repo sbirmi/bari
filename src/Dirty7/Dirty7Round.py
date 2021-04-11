@@ -23,7 +23,10 @@ from Dirty7.Card import (
         Card,
         CardGroupBase,
 )
-from Dirty7.Dirty7Rules import SupportedRules
+from Dirty7.Dirty7Rules import (
+        SupportedRules,
+        SupportedDeclareCutoffs,
+)
 from Dirty7.Exceptions import InvalidDataException
 
 def removeCards(cards1, cards2):
@@ -176,8 +179,12 @@ class RoundParameters:
         if numCardsToStart * numPlayers + 1 >= numDecks * 52 + numJokers:
             raise InvalidDataException("Not enough cards to deal to each player", numCardsToStart)
 
-        if not isinstance(declareMaxPoints, int) or declareMaxPoints <= 0:
-            raise InvalidDataException("Invalid points for declaring. Must be greater than 0",
+        if not isinstance(declareMaxPoints, list) or not declareMaxPoints:
+            raise InvalidDataException("Invalid choices for declaring. Must be a list of choices",
+                                       declareMaxPoints)
+
+        if not set(declareMaxPoints).issubset(SupportedDeclareCutoffs):
+            raise InvalidDataException("Invalid choices for declaring. Must be a list of choices",
                                        declareMaxPoints)
 
         if not isinstance(penaltyPoints, int) or penaltyPoints < 20:
