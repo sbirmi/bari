@@ -117,7 +117,7 @@ class Round:
         self.tableCards.makeRoundOver()
 
     def declare(self, event):
-        playerScores = {name: prs.hand.score(self.rule)
+        playerScores = {name: prs.hand.score()
                         for name, prs in self.playerRoundStatus.items()}
         scorePlayers = defaultdict(set)
 
@@ -203,7 +203,8 @@ class RoundParameters:
                                        stopPoints)
 
         if not isinstance(scoringSystems, list) or not scoringSystems:
-            raise InvalidDataException("Invalid choices for scoring systems. Must be a list of choices",
+            raise InvalidDataException("Invalid choices for scoring systems. "
+                                       "Must be a list of choices",
                                        scoringSystems)
 
         if not set(scoringSystems).issubset(set(SupportedScoringSystems)):
@@ -373,7 +374,7 @@ class PlayerHand(CardGroupBase):
         CardGroupBase.__init__(self, conns, playerConns)
         self.setCards(cards)
 
-    def score(self, rule):
+    def score(self):
         return self.scoringSystem.score(self.cards)
 
     def setCards(self, cards):

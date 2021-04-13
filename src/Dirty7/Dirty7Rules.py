@@ -50,7 +50,7 @@ class Heart1ScoringSystem(ScoringSystem):
         super(Heart1ScoringSystem, self).__init__("heart-1")
 
     def cardPoints(self, card):
-        if (card.suit == Card.HEARTS):
+        if card.suit == Card.HEARTS:
             return 1
         return min(card.rank, 10)
 
@@ -241,7 +241,7 @@ class RuleEngine:
         roundParams = round_.roundParams
         playerRoundStatus = round_.playerRoundStatus[player.name]
         playerHand = playerRoundStatus.hand
-        handScore = playerHand.score(self)
+        handScore = playerHand.score()
 
         if (roundParams.declareMaxPoints[0] and
                 handScore > roundParams.declareMaxPoints[0]):
