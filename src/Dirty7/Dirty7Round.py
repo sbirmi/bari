@@ -6,6 +6,7 @@ from collections import defaultdict
 import random
 
 from fwk.Common import Map
+from fwk.Exceptions import InvalidDataException
 from fwk.MsgSrc import (
         Jmai,
         MsgSrc,
@@ -28,7 +29,6 @@ from Dirty7.Dirty7Rules import (
         SupportedDeclareCutoffs,
         SupportedScoringSystems,
 )
-from Dirty7.Exceptions import InvalidDataException
 
 def removeCards(cards1, cards2):
     """returns cards1 - cards2"""

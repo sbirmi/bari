@@ -3,6 +3,7 @@
 import random
 import re
 
+from fwk.Exceptions import InvalidDataException
 from fwk.GamePlugin import GamePlugin
 from fwk.Msg import (
         ClientTxMsg,
@@ -32,10 +33,6 @@ from Dirty7.Dirty7Round import (
         Round,
         Turn,
 )
-from Dirty7.Exceptions import (
-        InvalidDataException,
-        InvalidPlayException,
-)
 from Dirty7.Events import (
         AdvanceTurn,
         Declare,
@@ -45,6 +42,7 @@ from Dirty7.Events import (
         StartRound,
         StopRound,
 )
+from Dirty7.Exceptions import InvalidPlayException
 
 validPlayerNameRe = re.compile("^[a-zA-Z0-9_]+$")
 validPasswdRe = re.compile("^[a-zA-Z0-9_]+$")
