@@ -27,7 +27,7 @@ Running the game server
     cd bari/src
     ./server.py
 
-The server listen on port 4000 (default) for websocket connections (no SSL).
+The server listen on port 4001 (default) for websocket connections (no SSL).
 
 A simple HTML page to manually test functionality by creating and sending/receiving websocket messages can be done with the following HTML page.
 
