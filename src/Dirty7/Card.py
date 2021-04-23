@@ -1,5 +1,5 @@
+from fwk.Exceptions import InvalidDataException
 from fwk.MsgSrc import MsgSrc
-from Dirty7.Exceptions import InvalidDataException
 
 CLUBS = "C"
 DIAMONDS = "D"
