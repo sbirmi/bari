@@ -6,7 +6,7 @@ from fwk.Msg import (
         InternalRegisterGi,
 )
 from fwk.MsgType import MTYPE_HOST_BAD
-from Dirty7.Exceptions import InvalidDataException
+from fwk.Exceptions import InvalidDataException
 from Dirty7.Dirty7Round import RoundParameters
 from Dirty7.Dirty7Room import Dirty7Room
 
