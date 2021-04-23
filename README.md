@@ -34,7 +34,7 @@ A simple HTML page to manually test functionality by creating and sending/receiv
     <html>
     <script>
     var conn = null;
-    var url = "ws://127.0.0.1:4000/";
+    var url = "ws://127.0.0.1:4001/";
     
     function receive(msg)   { console.log(msg.data); }
     function send(msg)      { conn.send(JSON.stringify(msg)); }
