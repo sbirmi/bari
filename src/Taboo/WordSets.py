@@ -1,3 +1,2 @@
 
-
-SupportedWordSets = {"foo"}  # FIXME
+SupportedWordSets = {"foo"}
