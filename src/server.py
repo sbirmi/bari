@@ -45,6 +45,7 @@ from fwk.Trace import (
 )
 import Chat.ChatLobbyPlugin
 import Dirty7.Dirty7Lobby
+import Taboo.TabooLobby
 
 
 WsIdAllocator = itertools.count()
@@ -151,6 +152,7 @@ def main(wsAddr="0.0.0.0", wsPort=WS_SERVER_PORT_DEFAULT):
     registerGameClass(fwk.LobbyPlugin.plugin())
     registerGameClass(Chat.ChatLobbyPlugin.plugin())
     registerGameClass(Dirty7.Dirty7Lobby.plugin())
+    registerGameClass(Taboo.TabooLobby.plugin())
 
     asyncio.get_event_loop().run_until_complete(wsServer)
     asyncio.get_event_loop().run_forever()

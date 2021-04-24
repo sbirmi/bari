@@ -68,6 +68,16 @@ Server --> client
 
 # Game room
 
+## Host parameters
+
+Informs players connected to a game room of the game parameters
+
+Server --> client
+
+```
+   ["HOST-PARAMETERS", host-parameters]
+```
+
 ## Player join interaction
 
 New players may be allowed to join in the middle of the game if the game isn't over. If late joinees are allowed, also allow players to leave the game halfway by pressing a button.
