@@ -9,6 +9,7 @@ from fwk.Msg import (
 from fwk.MsgType import MTYPE_HOST_BAD
 
 from Taboo.HostParameters import HostParameters
+from Taboo.TabooRoom import TabooRoom
 
 class TabooLobby(GameLobbyPlugin):
     """Lobby for Taboo"""
@@ -36,10 +37,11 @@ class TabooLobby(GameLobbyPlugin):
 
         self.gameIdx += 1
 
-        # TODO
-        #newRoom =
-        #self.rooms[self.gameIdx] = newRoom
-        #self.txQueue.put_nowait(InternalRegisterGi(newRoom, initiatorWs=qmsg.initiatorWs))
+        newRoom = TabooRoom("taboo:{}".format(self.gameIdx),
+                            "Taboo Room #{}".format(self.gameIdx),
+                            hostParameters)
+        self.rooms[self.gameIdx] = newRoom
+        self.txQueue.put_nowait(InternalRegisterGi(newRoom, initiatorWs=qmsg.initiatorWs))
 
         return True
 

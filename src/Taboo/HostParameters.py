@@ -75,3 +75,6 @@ class HostParameters:
             raise InvalidDataException("Invalid or unexpected host parameters keys", jmsg)
 
         return HostParameters(**jmsg[0])
+
+    def toJmsg(self):
+        return [dict(self.state)]
