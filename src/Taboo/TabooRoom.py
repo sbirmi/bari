@@ -77,7 +77,10 @@ class TabooRoom(GamePlugin):
             return True
 
         if qmsg.jmsg[0] == "JOIN":
+<<<<<<< HEAD
             print("Got Join")
+=======
+>>>>>>> b6da9e8d2f8765102122ad33d44e94666b3e1a3a
             return self.__processJoin(qmsg)
 
         return False
