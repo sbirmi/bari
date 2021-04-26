@@ -3,8 +3,8 @@ import re
 
 from fwk.GamePlugin import GamePlugin
 from fwk.Trace import (
-    trace,
-    Level,
+        trace,
+        Level,
 )
 from fwk.Msg import (
         ClientTxMsg,
@@ -77,7 +77,6 @@ class TabooRoom(GamePlugin):
             return True
 
         if qmsg.jmsg[0] == "JOIN":
-            print("Got Join")
             return self.__processJoin(qmsg)
 
         return False
