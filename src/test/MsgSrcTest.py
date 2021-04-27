@@ -9,6 +9,7 @@ from test.MsgTestLib import MsgTestLib
 from fwk.Msg import ClientTxMsg
 from fwk.MsgSrc import (
         Connections,
+        ConnectionsGroup,
         MsgSrc,
         Jmai,
 )
@@ -87,4 +88,110 @@ class MsgSrcConnectionsTest(unittest.TestCase, MsgTestLib):
         self.conns.addMsgSrc(msgSrc2)
         self.assertGiTxQueueMsgs(self.txq, [ClientTxMsg(["yes"], {clientWs1, clientWs3},
                                                         initiatorWs=None)],
+                                 anyOrder=True)
+
+class MsgSrcConnectionsGroupTest(unittest.TestCase, MsgTestLib):
+    """Test MsgSrc and Connections
+
+                    ConnectionsGroup
+    MsgSrc1 --> +---------------------+
+                |       Connections1  | --> WebSocket1
+    MsgSrc2 --> |                     |
+                |       Connections2  | --> WebSocket2, +WebSocket3
+    MsgSrc3 --> +---------------------+
+    """
+    def setUp(self):
+        self.txq = asyncio.Queue()
+        self.conns = ConnectionsGroup()
+
+    def testNoMessagesInitially(self):
+        self.assertGiTxQueueMsgs(self.txq, [])
+        self.assertEqual(self.conns.count(), 0)
+
+    def testAddConnectionsBeforeMsgSrc(self):
+        conns1 = Connections(self.txq)
+        conns2 = Connections(self.txq)
+        conns2.addConn(clientWs2)
+
+        self.assertGiTxQueueMsgs(self.txq, [])
+
+        self.conns.addConnections(conns1)
+        self.assertGiTxQueueMsgs(self.txq, [])
+
+        self.conns.addConnections(conns2)
+        self.assertGiTxQueueMsgs(self.txq, [])
+
+        # Add message sources
+
+        # message source with no messages
+        msgSrcEmpty = MsgSrc(self.conns) # pylint: disable=unused-variable
+        self.assertGiTxQueueMsgs(self.txq, [])
+
+        msgSrc = MsgSrc(self.conns)
+        msgSrc.setMsgs([Jmai([1], initiatorWs=clientWs3),
+                        Jmai([2], initiatorWs=clientWs3)])
+        self.assertGiTxQueueMsgs(self.txq, [ClientTxMsg([1], {clientWs2}, initiatorWs=clientWs3),
+                                            ClientTxMsg([2], {clientWs2}, initiatorWs=clientWs3)])
+
+    def testAddConnectionsAfterMsgSrc(self):
+        # message source with no messages
+        msgSrcEmpty = MsgSrc(self.conns) # pylint: disable=unused-variable
+
+
+        msgSrc = MsgSrc(self.conns)
+        msgSrc.setMsgs([Jmai([1], initiatorWs=clientWs3),
+                        Jmai([2], initiatorWs=clientWs3)])
+
+        self.assertGiTxQueueMsgs(self.txq, [])
+
+        # Add websockets afterwards
+
+        conns1 = Connections(self.txq)
+        conns2 = Connections(self.txq)
+        conns2.addConn(clientWs2)
+
+        self.conns.addConnections(conns1)
+        self.assertGiTxQueueMsgs(self.txq, [])
+
+        self.conns.addConnections(conns2)
+        self.assertGiTxQueueMsgs(self.txq, [ClientTxMsg([1], {clientWs2}, initiatorWs=clientWs3),
+                                            ClientTxMsg([2], {clientWs2}, initiatorWs=clientWs3)])
+
+        conns1.addConn(clientWs1)
+        self.assertGiTxQueueMsgs(self.txq, [ClientTxMsg([1], {clientWs1}, initiatorWs=clientWs3),
+                                            ClientTxMsg([2], {clientWs1}, initiatorWs=clientWs3)])
+
+    def testAddDelConnections(self):
+        conns1 = Connections(self.txq)
+        conns1.addConn(clientWs1)
+        conns2 = Connections(self.txq)
+        conns2.addConn(clientWs2)
+
+        self.conns.addConnections(conns1)
+        self.conns.addConnections(conns2)
+
+        msgSrc = MsgSrc(self.conns)
+        msgSrc.setMsgs([Jmai([1], initiatorWs=clientWs3),
+                        Jmai([2], initiatorWs=clientWs3)])
+
+
+        self.assertGiTxQueueMsgs(self.txq, [ClientTxMsg([1], {clientWs1}, initiatorWs=clientWs3),
+                                            ClientTxMsg([1], {clientWs2}, initiatorWs=clientWs3),
+                                            ClientTxMsg([2], {clientWs1}, initiatorWs=clientWs3),
+                                            ClientTxMsg([2], {clientWs2}, initiatorWs=clientWs3)],
+                                 anyOrder=True)
+
+        self.conns.delConnections(conns1)
+
+        clientWs4 = 104
+        conns3 = Connections(self.txq)
+        conns3.addConn(clientWs3)
+        conns3.addConn(clientWs4)
+
+        self.conns.addConnections(conns3)
+
+        self.assertGiTxQueueMsgs(self.txq, [ClientTxMsg([1], {clientWs3, clientWs4},
+                                                        initiatorWs=clientWs3),
+                                            ClientTxMsg([2], {clientWs3, clientWs4},
+                                                        initiatorWs=clientWs3)],
                                  anyOrder=True)
