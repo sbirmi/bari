@@ -154,5 +154,5 @@ class TabooRoom(GamePlugin):
     def __getTeam(self, teamNumber):
         team = self.teams.get(teamNumber)
         if not team:
-            return min(self.teams.values(), lambda t: len(t.members))
+            return min(self.teams.values(), key=lambda t: len(t.members))
         return team
