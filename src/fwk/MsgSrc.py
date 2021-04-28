@@ -18,19 +18,10 @@ from fwk.Msg import ClientTxMsg
 
 Jmai = namedtuple("JmsgAndInitiator", ["jmsg", "initiatorWs"])
 
-class Connections:
-    """A collection of websockets and message sources
-    (MsgSrc) that are feeding messages to these
-    websockets.
-    """
+class ConnectionsBase:
     def __init__(self, txQueue):
         self._txQueue = txQueue
         self._msgSrcs = set()
-        self._wss = set()
-
-    def count(self):
-        """Number of connections being tracked"""
-        return len(self._wss)
 
     @property
     def msgSrcs(self):
@@ -40,13 +31,41 @@ class Connections:
     def addMsgSrc(self, msgSrc):
         """Register a new MsgSrc for all websockets"""
         self._msgSrcs.add(msgSrc)
-        jmaiList = msgSrc.getMsgs()
-        self.send(jmaiList)
 
     def delMsgSrc(self, msgSrc):
         """Remove a MsgSrc for all websockets"""
         if msgSrc in self._msgSrcs:
             self._msgSrcs.remove(msgSrc)
+
+    def count(self):
+        """Number of connections tracked"""
+        raise NotImplementedError
+
+    def send(self, jmaiList, wss=None):
+        """Send the messages to a subset (or all) connections
+        Arguments
+        ---------
+        jmsgs : list of messages
+        wss : (optional) set of websockets
+            Websockets to send the messages. If not specified,
+            send the message to all websockets.
+        """
+        raise NotImplementedError
+
+class Connections(ConnectionsBase):
+    """A collection of websockets and message sources
+    (MsgSrc) that are feeding messages to these
+    websockets.
+    """
+    def __init__(self, txQueue):
+        super(Connections, self).__init__(txQueue)
+        self._wss = set()
+
+    def addMsgSrc(self, msgSrc):
+        """Register a new MsgSrc for all websockets"""
+        ConnectionsBase.addMsgSrc(self, msgSrc)
+        jmaiList = msgSrc.getMsgs()
+        self.send(jmaiList)
 
     def addConn(self, ws):
         """Add a websocket to the set of connections"""
@@ -60,12 +79,15 @@ class Connections:
         if ws in self._wss:
             self._wss.remove(ws)
 
+    def count(self):
+        """Number of connections being tracked"""
+        return len(self._wss)
+
     def send(self, jmaiList, wss=None):
         """Send the messages to a subset (or all) connections
         Arguments
         ---------
         jmsgs : list of messages
-        initiatorWs : websocket
         wss : (optional) set of websockets
             Websockets to send the messages. If not specified,
             send the message to all websockets.
@@ -76,6 +98,58 @@ class Connections:
 
         for jmai in jmaiList:
             self._txQueue.put_nowait(ClientTxMsg(jmai.jmsg, wss, initiatorWs=jmai.initiatorWs))
+
+class ConnectionsGroup(ConnectionsBase):
+    """ConnectionsGroup allows collecting multiple Connections as
+    a single Connections instance for the purposes of messaging.
+
+                    ConnectionsGroup
+    MsgSrc1 --> +---------------------+
+                |       Connections1  | --> WebSocket1
+    MsgSrc2 --> |                     |
+                |       Connections2  | --> WebSocket2, WebSocket3, ...
+    MsgSrc3 --> +---------------------+
+
+    """
+    def __init__(self):
+        super(ConnectionsGroup, self).__init__(None)
+        self._conns = set()
+
+    def addMsgSrc(self, msgSrc):
+        """Register a new MsgSrc for all websockets"""
+        ConnectionsBase.addMsgSrc(self, msgSrc)
+        for conn in self._conns:
+            conn.addMsgSrc(msgSrc)
+
+    def delMsgSrc(self, msgSrc):
+        """Remove a MsgSrc for all websockets"""
+        if msgSrc in self._msgSrcs:
+            self._msgSrcs.remove(msgSrc)
+            for conn in self._conns:
+                conn.delMsgSrc(msgSrc)
+
+    def addConnections(self, conn):
+        self._conns.add(conn)
+        for msgSrc in self._msgSrcs:
+            conn.addMsgSrc(msgSrc)
+
+    def delConnections(self, conn):
+        if conn in self._conns:
+            self._conns.remove(conn)
+            for msgSrc in self._msgSrcs:
+                conn.delMsgSrc(msgSrc)
+
+    def count(self):
+        return sum(conn for conn in self._conns)
+
+    def send(self, jmaiList, conns=None): # pylint: disable=arguments-differ
+        """Send the messages to all connections within all conns
+        Arguments
+        ---------
+        jmsgs : list of messages
+        """
+        for conn in conns or self._conns:
+            conn.send(jmaiList)
 
 class MsgSrc:
     """A source of messages that needs to be sent to
