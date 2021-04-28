@@ -4,7 +4,7 @@ from Taboo.TabooTeam import TabooTeam
 
 class TabooPlayer:
 
-    def __init__(self, txQueue, name, team):
+    def __init__(self, txQueue, name, team, roundsPlayed=0):
         """ Creates a taboo player associated to a team. Self-registers to the team
 
         txQueue: tx queue
@@ -15,6 +15,7 @@ class TabooPlayer:
         self.playerConns = Connections(txQueue)
         team.addPlayer(self)
         self.team = team
+        self.roundsPlayed = roundsPlayed
 
     def addConn(self, ws):
         self.playerConns.addConn(ws)
