@@ -10,6 +10,12 @@ from fwk.Msg import (
 from fwk.MsgSrc import Connections
 from Taboo import TabooRoom
 from Taboo.HostParameters import HostParameters
+from Taboo.TabooPlayer import TabooPlayer
+from Taboo.TabooTeam import TabooTeam
+from Taboo.Turn import (
+        Turn,
+        TurnState,
+)
 
 class TabooRoomTest(unittest.TestCase, MsgTestLib):
     def setUp(self):
@@ -59,4 +65,97 @@ class TabooRoomTest(unittest.TestCase, MsgTestLib):
                                     "numRounds": 1},
                  "clientCount": 1}
             ], "taboo:1"),
+        ], anyOrder=True)
+
+class TabooTurnTest(unittest.TestCase, MsgTestLib):
+    def setUp(self):
+        self.txq = asyncio.Queue()
+
+    def setUpTurn(self, turnIdx=1, wordIdx=1,
+                  secret=None, disallowed=None,
+                  player=None, otherTeams=None,
+                  allConns=None,
+                  state=TurnState.IN_PLAY,
+                  score=None,
+                  playerName="sb", playerTeamNum=1, playerWss=None,
+                  otherTeamNum=2, otherTeamWss=None):
+        # pylint: disable=too-many-locals
+        secret = secret or "a"
+        disallowed = disallowed or ["a1", "a2"]
+
+        playerWss = playerWss or {101} # 1 player
+        otherTeamWss = otherTeamWss or {102} # 1 other team member
+
+        allConns = Connections(self.txq)
+        for ws in playerWss | otherTeamWss | {103}: # 1 spectator added
+            allConns.addConn(ws)
+
+        playerTeam = TabooTeam(self.txq, playerTeamNum)
+        player = TabooPlayer(self.txq, name=playerName, team=playerTeam)
+        for ws in playerWss:
+            player.playerConns.addConn(ws)
+
+        otherTeam = TabooTeam(self.txq, otherTeamNum)
+        for ws in otherTeamWss:
+            otherTeam.conns.addConn(ws)
+
+        otherTeams = [otherTeam]
+        score = score or []
+
+        return Turn(turnIdx=turnIdx, wordIdx=wordIdx,
+                    secret=secret, disallowed=disallowed,
+                    player=player, otherTeams=otherTeams,
+                    allConns=allConns,
+                    state=state,
+                    score=score)
+
+    def testBasic(self):
+        turn = self.setUpTurn()
+
+        self.assertGiTxQueueMsgs(self.txq, [
+            ClientTxMsg(["TURN", 1, 1, {"team": 1, "player": "sb", "state": "IN_PLAY"}],
+                        {101, 102, 103}),
+            ClientTxMsg(["TURN", 1, 1, {"team": 1, "player": "sb", "state": "IN_PLAY",
+                                        "secret": "a",
+                                        "disallowed": ["a1", "a2"]}],
+                        {101}),
+            ClientTxMsg(["TURN", 1, 1, {"team": 1, "player": "sb", "state": "IN_PLAY",
+                                        "secret": "a",
+                                        "disallowed": ["a1", "a2"]}],
+                        {102}),
+        ], anyOrder=True)
+        self.assertIsNotNone(turn.privateMsgSrc)
+
+        turn.state = TurnState.COMPLETED
+        turn.score = [1]
+        turn.updateMsgs()
+        self.assertIsNone(turn.privateMsgSrc) # privateMsgSrc should be deleted
+        self.assertGiTxQueueMsgs(self.txq, [
+            ClientTxMsg(["TURN", 1, 1, {"team": 1, "player": "sb", "state": "COMPLETED",
+                                        "secret": "a",
+                                        "disallowed": ["a1", "a2"],
+                                        "score": [1]}],
+                        {101, 102, 103}),
+        ], anyOrder=True)
+
+        turn.state = TurnState.DISCARDED
+        turn.score = [2]
+        turn.updateMsgs()
+        self.assertGiTxQueueMsgs(self.txq, [
+            ClientTxMsg(["TURN", 1, 1, {"team": 1, "player": "sb", "state": "DISCARDED",
+                                        "secret": "a",
+                                        "disallowed": ["a1", "a2"],
+                                        "score": [2]}],
+                        {101, 102, 103}),
+        ], anyOrder=True)
+
+        turn.state = TurnState.TIMED_OUT
+        turn.score = [2]
+        turn.updateMsgs()
+        self.assertGiTxQueueMsgs(self.txq, [
+            ClientTxMsg(["TURN", 1, 1, {"team": 1, "player": "sb", "state": "TIMED_OUT",
+                                        "secret": "a",
+                                        "disallowed": ["a1", "a2"],
+                                        "score": [2]}],
+                        {101, 102, 103}),
         ], anyOrder=True)
