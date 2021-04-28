@@ -55,15 +55,16 @@ Team: [0=auto, 1..T]
 {"numTeams": <int>,         # 1..4
  "turnDurationSec": <int>,  # 30..180
  "wordSets": ["name1", "name2", ...],
- "allowLateJoinees": <bool>} 
+ "numRounds": <int>,        # 1..8
+}
 ```
 
 ## Room status updates
 
-Server --> client
+Server --> Lobby
 
 ```
-["GAME-STATUS", <path:str>, {"gameState": <str>,
+["GAME-STATUS", <path:str>, {"gameState": <str>,    WAITING_FOR_GAME_TO_START, WAITING_FOR_KICKOFF, TURN, GAME_OVER
                              "clientCount": <str>,
                              "spectatorCount": <int>,
                              "hostParams": <dict>,
@@ -71,6 +72,14 @@ Server --> client
                                 winnerTeam<int>,
                                 winnerTeam<int>,
                              ]}]
+```
+
+## Game over
+
+Server --> client
+
+```
+["GAME-OVER", [winnerTeamId1, winnerTeamId2]]
 ```
 
 The "winners" key only appears if the game is over
@@ -89,12 +98,12 @@ Server --> client
 
 ## Player join interaction
 
-New players may be allowed to join in the middle of the game if the game isn't over. If late joinees are allowed, also allow players to leave the game halfway by pressing a button.
+New players may be allowed to join in the middle of the game if the game isn't over.
 
 Client --> Server
 
 ```
-["JOIN", playerName, team:int={0..T}]   # T = number of teams
+["JOIN", playerName:str, team:int={0..T}]   # T = number of teams
    ["JOIN-OKAY", playerName, team:int=t]
    ["JOIN-BAD", "reason", (opt) bad-data]
 ```
@@ -114,11 +123,7 @@ Client --> Server
 Server --> client
 
 ```
-["TEAM-STATUS",
- {team<int>: ["plyr1", "plyr2", ...],
-  team<int>: ["plyr3": ... ],
- }
-]
+["TEAM-STATUS", team:int, ["plyr1", "plyr2", ...]]
 ```
 
 Players are listed in turn order.
@@ -144,7 +149,7 @@ Server --> client
  wordIdx<int>,
  {"team": <int>,
   "player": <str>,
-  "result": IN_PLAY | COMPLETED | DISCARDED | DISCARDED_WITH_ALERTS,
+  "state": IN_PLAY,
  }
 ]
 
@@ -155,7 +160,7 @@ Server --> client
   "player": <str>,
   "secret": <str>,
   "disallowed": [<str1>, ...],
-  "result": IN_PLAY | COMPLETED | DISCARDED | DISCARDED_WITH_ALERTS,
+  "state": IN_PLAY,
  }
 ]
 
@@ -166,7 +171,8 @@ Server --> client
   "player": <str>,
   "secret": <str>,
   "disallowed": [<str1>, ...],
-  "result": IN_PLAY | COMPLETED | DISCARDED | DISCARDED_WITH_ALERTS,
+  "state": COMPLETED | TIMED_OUT | DISCARDED,
+  "score": [teamId1, teamId2, ...],
  }
 ]
 ```
@@ -204,4 +210,11 @@ Client --> start
 
 ```
 ["START"]
+```
+
+## Start turn
+
+Client --> server
+```
+["KICKOFF"]
 ```

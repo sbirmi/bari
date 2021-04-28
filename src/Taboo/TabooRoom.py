@@ -24,7 +24,7 @@ class TabooRoom(GamePlugin):
         self.playerByWs = {} #<ws:player>
         self.teams = {} #<teamNumber:team>
 
-    def init_game(self):
+    def initGame(self):
         self.hostParametersMsgSrc = HostParametersMsgSrc(self.conns, self.hostParameters)
 
     def publishGiStatus(self):
@@ -43,7 +43,7 @@ class TabooRoom(GamePlugin):
         """Invoked when the RX+TX queues are set up to the room and
         when the self.conns object is setup to track all clients in the room
         """
-        self.init_game()
+        self.initGame()
         self.publishGiStatus()
 
     def postProcessConnect(self, ws):
