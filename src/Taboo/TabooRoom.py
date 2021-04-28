@@ -55,17 +55,11 @@ class TabooRoom(GamePlugin):
 
     def postProcessDisconnect(self, ws):
         """Invoked when a client disconnects from the room"""
-        if self.playerByWs.get(ws, None):
-            try:
-                self.playerByWs[ws].delConn(ws)
-            except KeyError:
-                pass
-
-        try:
-            del self.playerByWs[ws]
-        except KeyError:
-            pass
-
+        assert ws in self.playerByWs, "Invalid disconnect on a non-existant connection"
+        player = self.playerByWs[ws]
+        if player:
+            player.delConn(ws)
+        del self.playerByWs[ws]
         self.publishGiStatus()
 
     def processMsg(self, qmsg):
@@ -87,12 +81,13 @@ class TabooRoom(GamePlugin):
         """
         ws = qmsg.initiatorWs
 
-        if ws not in self.playerByWs or self.playerByWs[ws]: #QQ
+        assert ws in self.playerByWs, "Join request from an unrecognized connection"
+
+        if self.playerByWs[ws]:
             self.txQueue.put_nowait(ClientTxMsg(["JOIN-BAD",
                                                  "Unexpected JOIN message from client that "
                                                  "has already joined"], {ws}, initiatorWs=ws))
             return True
-
 
         if len(qmsg.jmsg) != 3:
             self.txQueue.put_nowait(ClientTxMsg(["JOIN-BAD", "Invalid message length"],
@@ -112,6 +107,10 @@ class TabooRoom(GamePlugin):
                                                 {ws}, initiatorWs=ws))
             return True
 
+        return self.joinPlayer(ws, playerName, teamNumber)
+
+
+    def joinPlayer(self, ws, playerName, teamNumber):
         player, team = self.getPlayer(playerName)
 
         # A new player joins
@@ -121,7 +120,7 @@ class TabooRoom(GamePlugin):
                 self.teams[teamNumber] = TabooTeam(teamNumber)
             team = self.teams.get(teamNumber)
             player = TabooPlayer(self.txQueue, playerName, team)
-            self.__finalize_join(ws, player, team.teamNumber)
+            self.__finalizeJoin(ws, player, team.teamNumber)
             #self.processEvent(PlayerJoin(player))
             return True
 
@@ -130,9 +129,9 @@ class TabooRoom(GamePlugin):
         #but we ignore the requested team and associate the player to the original team
         if teamNumber != team.teamNumber:
             trace(Level.warn, "Player {} forced to join their "
-            "original team {}".format(player.name, team.teamNumber))
+                "original team {}".format(player.name, team.teamNumber))
 
-        self.__finalize_join(ws, player, team.teamNumber)
+        self.__finalizeJoin(ws, player, team.teamNumber)
         return True
 
     def getPlayer(self, playerName):
@@ -149,7 +148,7 @@ class TabooRoom(GamePlugin):
                 return (v, t)
         return (None, None)
 
-    def __finalize_join(self, ws, player, teamNumber):
+    def __finalizeJoin(self, ws, player, teamNumber):
         player.addConn(ws)
         self.playerByWs[ws] = player
         self.txQueue.put_nowait(ClientTxMsg(["JOIN-OKAY", player.name, teamNumber],
