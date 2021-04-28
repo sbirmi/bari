@@ -21,7 +21,8 @@ class TabooRoomTest(unittest.TestCase, MsgTestLib):
 
         hostParameters = HostParameters(numTeams=2,
                                         turnDurationSec=30,
-                                        wordSets=["foo"])
+                                        wordSets=["foo"],
+                                        numRounds=1)
         room = TabooRoom.TabooRoom("taboo:1", "Taboo Room #1", hostParameters)
         room.setRxTxQueues(rxq, txq)
 
@@ -37,7 +38,8 @@ class TabooRoomTest(unittest.TestCase, MsgTestLib):
             InternalGiStatus([
                 {"hostParameters": {"numTeams": 2,
                                     "turnDurationSec": 30,
-                                    "wordSets": ["foo"]},
+                                    "wordSets": ["foo"],
+                                    "numRounds": 1},
                  "clientCount": 0}
             ], "taboo:1"),
         ], anyOrder=True)
@@ -48,11 +50,13 @@ class TabooRoomTest(unittest.TestCase, MsgTestLib):
         self.assertGiTxQueueMsgs(env.txq, [
             ClientTxMsg(['HOST-PARAMETERS', {'numTeams': 2,
                                              'turnDurationSec': 30,
-                                             'wordSets': ['foo']}], {ws1}),
+                                             'wordSets': ['foo'],
+                                             'numRounds': 1}], {ws1}),
             InternalGiStatus([
                 {"hostParameters": {"numTeams": 2,
                                     "turnDurationSec": 30,
-                                    "wordSets": ["foo"]},
+                                    "wordSets": ["foo"],
+                                    "numRounds": 1},
                  "clientCount": 1}
             ], "taboo:1"),
         ], anyOrder=True)

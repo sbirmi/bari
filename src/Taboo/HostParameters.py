@@ -12,6 +12,8 @@ MAX_TEAMS = 4
 MIN_TURN_DURATION = 30
 MAX_TURN_DURATION = 180
 
+MAX_ROUNDS = 8
+
 class HostParameters:
     """Tracks host parameters for a game
 
@@ -27,12 +29,14 @@ class HostParameters:
     ctrArgs = ("numTeams",
                "turnDurationSec",
                "wordSets",
+               "numRounds",
               )
 
     def __init__(self,
                  numTeams,
                  turnDurationSec,
-                 wordSets):
+                 wordSets,
+                 numRounds):
         self.msgSrc = None
 
         if not isinstance(numTeams, int) or numTeams < MIN_TEAMS or numTeams > MAX_TEAMS:
@@ -46,9 +50,11 @@ class HostParameters:
                 not set(wordSets).issubset(SupportedWordSets)):
             raise InvalidDataException("Invalid type or wordSets", wordSets)
 
-        self.state = Map(numTeams=numTeams,
-                         turnDurationSec=turnDurationSec,
-                         wordSets=wordSets)
+        if (not isinstance(numRounds, int) or numRounds < 1 or numRounds > MAX_ROUNDS):
+            raise InvalidDataException("Invalid type or numRounds", numRounds)
+
+        vals = locals()
+        self.state = Map(**{argName: vals[argName] for argName in self.ctrArgs})
 
     def __getattr__(self, name):
         """When access hostParameters.numTeams, fetch it from self.state instead"""
