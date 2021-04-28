@@ -27,14 +27,12 @@ class HostParameters:
     ctrArgs = ("numTeams",
                "turnDurationSec",
                "wordSets",
-               "allowLateJoinees",
               )
 
     def __init__(self,
                  numTeams,
                  turnDurationSec,
-                 wordSets,
-                 allowLateJoinees):
+                 wordSets):
         self.msgSrc = None
 
         if not isinstance(numTeams, int) or numTeams < MIN_TEAMS or numTeams > MAX_TEAMS:
@@ -48,13 +46,9 @@ class HostParameters:
                 not set(wordSets).issubset(SupportedWordSets)):
             raise InvalidDataException("Invalid type or wordSets", wordSets)
 
-        if not isinstance(allowLateJoinees, bool):
-            raise InvalidDataException("Invalid type or allowLateJoinees", allowLateJoinees)
-
         self.state = Map(numTeams=numTeams,
                          turnDurationSec=turnDurationSec,
-                         wordSets=wordSets,
-                         allowLateJoinees=allowLateJoinees)
+                         wordSets=wordSets)
 
     def __getattr__(self, name):
         """When access hostParameters.numTeams, fetch it from self.state instead"""

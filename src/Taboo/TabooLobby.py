@@ -22,8 +22,7 @@ class TabooLobby(GameLobbyPlugin):
             "HOST", "taboo",
             {"numTeams": <int>,         # 1..4
              "turnDurationSec": <int>,  # 30..180
-             "wordSets": ["name1", "name2", ...],
-             "allowLateJoinees": <bool>}]
+             "wordSets": ["name1", "name2", ...]}]
 
         qmsg.jmsg = original_message[2:]
         """

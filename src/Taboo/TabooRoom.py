@@ -22,7 +22,7 @@ class TabooRoom(GamePlugin):
         self.hostParameters = hostParameters
         self.hostParametersMsgSrc = None
         self.playerByWs = {} #<ws:player>
-        self.teams = {} #<teamNumber:team>
+        self.teams = {n:TabooTeam(n) for n in range(1, hostParameters.numTeams+1)} #<teamNumber:team>
 
     def initGame(self):
         self.hostParametersMsgSrc = HostParametersMsgSrc(self.conns, self.hostParameters)
@@ -111,48 +111,49 @@ class TabooRoom(GamePlugin):
 
 
     def joinPlayer(self, ws, playerName, teamNumber):
-        player, team = self.getPlayer(playerName)
+        player = self.getPlayer(playerName)
 
         # A new player joins
         if not player:
-            if teamNumber not in self.teams:
-                #A new team
-                self.teams[teamNumber] = TabooTeam(teamNumber)
-            team = self.teams.get(teamNumber)
+            team = self.__getTeam(teamNumber)
             player = TabooPlayer(self.txQueue, playerName, team)
-            self.__finalizeJoin(ws, player, team.teamNumber)
+            self.__finalizeJoin(ws, player)
             #self.processEvent(PlayerJoin(player))
             return True
 
-        assert team is not None, "What happened!"
         #new join-request for an existing player will be accepted
         #but we ignore the requested team and associate the player to the original team
         if teamNumber != team.teamNumber:
             trace(Level.warn, "Player {} forced to join their "
                 "original team {}".format(player.name, team.teamNumber))
 
-        self.__finalizeJoin(ws, player, team.teamNumber)
+        self.__finalizeJoin(ws, player)
         return True
 
     def getPlayer(self, playerName):
         """ Returns (player, team)
 
             player: player matching the name
-            team: team it belongs to
-
-            (None, None) if no player exists by that name
+                None if no player exists by that name
         """
         for t in self.teams.values():
             v = t.getPlayer(playerName)
             if v is not None:
-                return (v, t)
-        return (None, None)
+                return v
+        return None
 
-    def __finalizeJoin(self, ws, player, teamNumber):
+    def __finalizeJoin(self, ws, player):
         player.addConn(ws)
         self.playerByWs[ws] = player
-        self.txQueue.put_nowait(ClientTxMsg(["JOIN-OKAY", player.name, teamNumber],
+        self.txQueue.put_nowait(ClientTxMsg(["JOIN-OKAY", player.name, player.team.teamNumber],
             {ws}, initiatorWs=ws))
 
     def spectatorCount(self):
         return sum(1 for plyr in self.playerByWs.values() if not plyr)
+
+    def __getTeam(self, teamNumber):
+        team = self.teams.get(teamNumber)
+        if not team:
+            return min(self.teams.values(), lambda t: len(t.members))
+        return team
+        
