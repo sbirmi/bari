@@ -22,7 +22,7 @@ class TabooRoom(GamePlugin):
         self.hostParameters = hostParameters
         self.hostParametersMsgSrc = None
         self.playerByWs = {} #<ws:player>
-        self.teams = {n:TabooTeam(n) for n in range(1, hostParameters.numTeams+1)} #<teamNumber:team>
+        self.teams = {n:TabooTeam(n) for n in range(1, hostParameters.numTeams+1)}
 
     def initGame(self):
         self.hostParametersMsgSrc = HostParametersMsgSrc(self.conns, self.hostParameters)
@@ -131,7 +131,7 @@ class TabooRoom(GamePlugin):
         return True
 
     def getPlayer(self, playerName):
-        """ Returns (player, team)
+        """ Returns player
 
             player: player matching the name
                 None if no player exists by that name
@@ -156,4 +156,3 @@ class TabooRoom(GamePlugin):
         if not team:
             return min(self.teams.values(), lambda t: len(t.members))
         return team
-        
