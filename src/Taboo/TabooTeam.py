@@ -1,5 +1,6 @@
 """ Taboo Team"""
 
+from fwk.MsgSrc import Connections
 from fwk.Trace import (
     trace,
     Level,
@@ -9,9 +10,12 @@ class TabooTeam:
     """ Creates a team with a specified teamNumber
 
     """
-    def __init__(self, teamNumber):
+    def __init__(self, txQueue, teamNumber):
+        self.txQueue = txQueue
         self.teamNumber = teamNumber
+
         self.members = {}
+        self.conns = Connections(self.txQueue)
 
     def addPlayer(self, player):
         """ Players need to be unique. Reset not allowed

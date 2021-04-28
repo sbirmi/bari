@@ -22,10 +22,12 @@ class TabooRoom(GamePlugin):
         self.hostParameters = hostParameters
         self.hostParametersMsgSrc = None
         self.playerByWs = {} #<ws:player>
-        self.teams = {n:TabooTeam(n) for n in range(1, hostParameters.numTeams+1)}
+        self.teams = None # int -> Team
 
     def initGame(self):
         self.hostParametersMsgSrc = HostParametersMsgSrc(self.conns, self.hostParameters)
+        self.teams = {n: TabooTeam(self.txQueue, n)
+                      for n in range(1, self.hostParameters.numTeams + 1)}
 
     def publishGiStatus(self):
         """Invoked to update the lobby of the game instance (room) status
