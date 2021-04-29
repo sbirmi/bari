@@ -7,6 +7,10 @@ from fwk.MsgSrc import (
         Jmai,
         MsgSrc,
 )
+from fwk.Trace import (
+        trace,
+        Level,
+)
 
 class WordState(Enum):
     IN_PLAY = 1
@@ -28,6 +32,8 @@ class Turn:
         self._otherTeams = otherTeams
         self._state = state
         self._score = score or [] # list of teamNumbers that should be awarded points
+
+        trace(Level.rnd, "New Turn", str(self))
 
         # Messages are broadcast to everyone connected to the room
         self._publicMsgSrc = MsgSrc(allConns)

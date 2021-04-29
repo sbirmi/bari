@@ -55,7 +55,7 @@ Team: [0=auto, 1..T]
 {"numTeams": <int>,         # 1..4
  "turnDurationSec": <int>,  # 30..180
  "wordSets": ["name1", "name2", ...],
- "numRounds": <int>,        # 1..8
+ "numTurns": <int>,        # 1..8
 }
 ```
 
@@ -209,7 +209,7 @@ All connected players hit the ready button (each team must have at least 2 playe
 Client --> start
 
 ```
-["START"]
+["READY"]
 ```
 
 ## Start turn

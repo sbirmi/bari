@@ -5,8 +5,10 @@ import unittest
 from test.MsgTestLib import MsgTestLib
 from fwk.Common import Map
 from fwk.Msg import (
+        ClientRxMsg,
         ClientTxMsg,
         InternalGiStatus,
+        TimerRequest,
 )
 from fwk.MsgSrc import Connections
 from Taboo import TabooRoom
@@ -22,9 +24,24 @@ from Taboo.WordSets import SupportedWordSets
 
 # pylint: disable=protected-access
 
+def mockPlyrTeam(txq, teamId,
+                 connsByPlayerName,
+                 turnsPlayedByPlayerName=None):
+    turnsPlayedByPlayerName = turnsPlayedByPlayerName or {}
+
+    team = TabooTeam(txq, teamId)
+    for plyrName, conns in connsByPlayerName.items():
+        plyr = TabooPlayer(txq, name=plyrName, team=team)
+        for ws in conns:
+            plyr.playerConns.addConn(ws)
+            team.conns.addConn(ws)
+
+        plyr.turnsPlayed = turnsPlayedByPlayerName.get(plyrName, 0)
+    return team
+
 class TabooRoomTest(unittest.TestCase, MsgTestLib):
     def setUp(self):
-        pass
+        random.seed(1)
 
     def setUpTabooRoom(self):
         rxq = asyncio.Queue()
@@ -33,7 +50,7 @@ class TabooRoomTest(unittest.TestCase, MsgTestLib):
         hostParameters = HostParameters(numTeams=2,
                                         turnDurationSec=30,
                                         wordSets=["test"],
-                                        numRounds=1)
+                                        numTurns=1)
         room = TabooRoom.TabooRoom("taboo:1", "Taboo Room #1", hostParameters)
         room.setRxTxQueues(rxq, txq)
 
@@ -41,6 +58,13 @@ class TabooRoomTest(unittest.TestCase, MsgTestLib):
                    txq=txq,
                    hostParameters=hostParameters,
                    room=room)
+
+    def setUpTeamPlayer(self, env, teamId, plyrName, wss):
+        for ws in wss:
+            env.room.joinPlayer(ws, plyrName, teamId)
+            assert ws not in env.room.teams[teamId].conns._wss
+            env.room.teams[teamId].conns.addConn(ws) # HACK
+            env.room.conns.addConn(ws)
 
     def testNewGame(self):
         env = self.setUpTabooRoom()
@@ -50,7 +74,7 @@ class TabooRoomTest(unittest.TestCase, MsgTestLib):
                 {"hostParameters": {"numTeams": 2,
                                     "turnDurationSec": 30,
                                     "wordSets": ["test"],
-                                    "numRounds": 1},
+                                    "numTurns": 1},
                  "clientCount": 0}
             ], "taboo:1"),
         ], anyOrder=True)
@@ -62,15 +86,66 @@ class TabooRoomTest(unittest.TestCase, MsgTestLib):
             ClientTxMsg(['HOST-PARAMETERS', {'numTeams': 2,
                                              'turnDurationSec': 30,
                                              'wordSets': ['test'],
-                                             'numRounds': 1}], {ws1}),
+                                             'numTurns': 1}], {ws1}),
             InternalGiStatus([
                 {"hostParameters": {"numTeams": 2,
                                     "turnDurationSec": 30,
                                     "wordSets": ["test"],
-                                    "numRounds": 1},
+                                    "numTurns": 1},
                  "clientCount": 1}
             ], "taboo:1"),
         ], anyOrder=True)
+
+    def testKickoff(self):
+        env = self.setUpTabooRoom()
+        self.drainGiTxQueue(env.txq)
+
+        env.room.processMsg(ClientRxMsg(["KICKOFF", 2], 101))
+        self.assertGiTxQueueMsgs(env.txq, [
+            ClientTxMsg(["KICKOFF-BAD", "Invalid message length"], {101}, 101),
+        ])
+
+        env.room.processMsg(ClientRxMsg(["KICKOFF"], 101))
+        self.assertGiTxQueueMsgs(env.txq, [
+            ClientTxMsg(["KICKOFF-BAD", "Game not running yet"], {101}, 101),
+        ])
+
+
+        env.room.state = TabooRoom.GameState.RUNNING
+        self.setUpTeamPlayer(env, 1, "sb1", [101])
+        self.setUpTeamPlayer(env, 1, "sb2", [102])
+        self.setUpTeamPlayer(env, 2, "jg1", [201])
+        self.setUpTeamPlayer(env, 2, "jg2", [202])
+        self.drainGiTxQueue(env.txq)
+
+        env.room.processMsg(ClientRxMsg(["KICKOFF"], 101))
+        self.assertGiTxQueueMsgs(env.txq, [
+            ClientTxMsg(["KICKOFF-BAD", "It is not your turn"], {101}, 101),
+        ])
+
+        env.room.turnMgr.startNewTurn()
+        env.room.processMsg(ClientRxMsg(["KICKOFF"], 101))
+        self.assertGiTxQueueMsgs(env.txq, [
+            ClientTxMsg(["KICKOFF-BAD", "It is not your turn"], {101}, 101),
+        ])
+
+        env.room.processMsg(ClientRxMsg(["KICKOFF"], 201))
+        secretMsg = ['TURN', 1, 1, {'team': 2, 'player': 'jg1', 'state': 'IN_PLAY',
+                     'secret': 'c', 'disallowed': ['c1', 'c2']}]
+        publicMsg = ['TURN', 1, 1, {'team': 2, 'player': 'jg1', 'state': 'IN_PLAY'}]
+        self.assertGiTxQueueMsgs(env.txq, [
+            TimerRequest(30, env.room.turnMgr.timerExpiredCb, {
+                            "turnId": 1,
+                         }),
+            ClientTxMsg(secretMsg, {201}),
+            ClientTxMsg(secretMsg, {101, 102}),
+            ClientTxMsg(publicMsg, {101, 102, 201, 202}),
+        ], anyOrder=True)
+
+        env.room.processMsg(ClientRxMsg(["KICKOFF"], 201))
+        self.assertGiTxQueueMsgs(env.txq, [
+            ClientTxMsg(["KICKOFF-BAD", "Can't kickoff a turn"], {201}, 201),
+        ])
 
 class TabooTurnTest(unittest.TestCase, MsgTestLib):
     def setUp(self):
@@ -187,40 +262,31 @@ class TabooTurnManagerTest(unittest.TestCase, MsgTestLib):
     def setUp(self):
         random.seed(1)
 
-    def mockPlyrTeam(self, txq, teamId,
-                     connsByPlayerName,
-                     turnsPlayedByPlayerName=None):
-        turnsPlayedByPlayerName = turnsPlayedByPlayerName or {}
-
-        team = TabooTeam(txq, teamId)
-        for plyrName, conns in connsByPlayerName.items():
-            plyr = TabooPlayer(txq, name=plyrName, team=team)
-            for ws in conns:
-                plyr.playerConns.addConn(ws)
-                team.conns.addConn(ws)
-
-            plyr.turnsPlayed = turnsPlayedByPlayerName.get(plyrName, 0)
-        return team
-
     def testBasic(self):
         txq = asyncio.Queue()
         wordset = SupportedWordSets["test"]
 
-        team1 = self.mockPlyrTeam(txq, 1, {"sb1": [101], "sb2": [102]}, {})
-        team2 = self.mockPlyrTeam(txq, 2, {"jg1": [201], "jg2": [202]}, {})
+        team1 = mockPlyrTeam(txq, 1, {"sb1": [101], "sb2": [102]}, {})
+        team2 = mockPlyrTeam(txq, 2, {"jg1": [201], "jg2": [202]}, {})
 
         teams = {1: team1, 2: team2}
-        hostNumRounds = 2
+        hostParameters = HostParameters(numTeams=2,
+                                        turnDurationSec=30,
+                                        wordSets=["test"],
+                                        numTurns=2)
 
         allConns = Connections(txq)
         for team in teams.values():
             for ws in team.conns._wss:
                 allConns.addConn(ws)
 
-        turnMgr = TurnManager(txq, wordset, teams, hostNumRounds, allConns)
+        turnMgr = TurnManager(txq, wordset, teams, hostParameters, allConns)
         self.assertGiTxQueueMsgs(txq, [])
 
         self.assertTrue(turnMgr.startNewTurn())
+        self.assertGiTxQueueMsgs(txq, [])
+
+        self.assertTrue(turnMgr.startNextWord())
         secretMsg = ['TURN', 1, 1, {'team': 2, 'player': 'jg1', 'state': 'IN_PLAY',
                                     'secret': 'c', 'disallowed': ['c1', 'c2']}]
         publicMsg = ['TURN', 1, 1, {'team': 2, 'player': 'jg1', 'state': 'IN_PLAY'}]
@@ -230,22 +296,25 @@ class TabooTurnManagerTest(unittest.TestCase, MsgTestLib):
             ClientTxMsg(secretMsg, {201}),
         ], anyOrder=True)
 
-    def testEnoughRoundsPlayed(self):
+    def testEnoughTurnsPlayed(self):
         txq = asyncio.Queue()
         wordset = SupportedWordSets["test"]
 
-        team1 = self.mockPlyrTeam(txq, 1, {"sb": [101]}, {"sb": 2})
-        team2 = self.mockPlyrTeam(txq, 2, {"jg": [102]}, {"jg": 2})
+        team1 = mockPlyrTeam(txq, 1, {"sb": [101]}, {"sb": 2})
+        team2 = mockPlyrTeam(txq, 2, {"jg": [102]}, {"jg": 2})
 
         teams = {1: team1, 2: team2}
-        hostNumRounds = 2
+        hostParameters = HostParameters(numTeams=2,
+                                        turnDurationSec=30,
+                                        wordSets=["test"],
+                                        numTurns=2)
 
         allConns = Connections(txq)
         for team in teams.values():
             for ws in team.conns._wss:
                 allConns.addConn(ws)
 
-        turnMgr = TurnManager(txq, wordset, teams, hostNumRounds, allConns)
+        turnMgr = TurnManager(txq, wordset, teams, hostParameters, allConns)
 
         self.assertFalse(turnMgr.startNewTurn())
         self.assertGiTxQueueMsgs(txq, [])
@@ -254,20 +323,25 @@ class TabooTurnManagerTest(unittest.TestCase, MsgTestLib):
         txq = asyncio.Queue()
         wordset = SupportedWordSets["test"]
 
-        team1 = self.mockPlyrTeam(txq, 1, {"sb1": [101], "sb2": [102]})
-        team2 = self.mockPlyrTeam(txq, 2, {"jg1": [201], "jg2": [202]})
+        team1 = mockPlyrTeam(txq, 1, {"sb1": [101], "sb2": [102]})
+        team2 = mockPlyrTeam(txq, 2, {"jg1": [201], "jg2": [202]})
 
         teams = {1: team1, 2: team2}
-        hostNumRounds = 2
+        hostParameters = HostParameters(numTeams=2,
+                                        turnDurationSec=30,
+                                        wordSets=["test"],
+                                        numTurns=2)
 
         allConns = Connections(txq)
         for team in teams.values():
             for ws in team.conns._wss:
                 allConns.addConn(ws)
 
-        turnMgr = TurnManager(txq, wordset, teams, hostNumRounds, allConns)
+        turnMgr = TurnManager(txq, wordset, teams, hostParameters, allConns)
 
         self.assertTrue(turnMgr.startNewTurn())
+
+        self.assertTrue(turnMgr.startNextWord())
         secretMsg = ['TURN', 1, 1, {'team': 2, 'player': 'jg1', 'state': 'IN_PLAY',
                                     'secret': 'c', 'disallowed': ['c1', 'c2']}]
         publicMsg = ['TURN', 1, 1, {'team': 2, 'player': 'jg1', 'state': 'IN_PLAY'}]
@@ -279,6 +353,9 @@ class TabooTurnManagerTest(unittest.TestCase, MsgTestLib):
 
         turnMgr._curTurn.player.turnsPlayed += 1
         self.assertTrue(turnMgr.startNewTurn())
+        self.assertGiTxQueueMsgs(txq, [])
+
+        self.assertTrue(turnMgr.startNextWord())
         secretMsg = ['TURN', 2, 1, {'team': 1, 'player': 'sb1', 'state': 'IN_PLAY',
                                     'secret': 'a', 'disallowed': ['a1', 'a2']}]
         publicMsg = ['TURN', 2, 1, {'team': 1, 'player': 'sb1', 'state': 'IN_PLAY'}]
@@ -290,6 +367,8 @@ class TabooTurnManagerTest(unittest.TestCase, MsgTestLib):
 
         turnMgr._curTurn.player.turnsPlayed += 1
         self.assertTrue(turnMgr.startNewTurn())
+
+        self.assertTrue(turnMgr.startNextWord())
         secretMsg = ['TURN', 3, 1, {'team': 2, 'player': 'jg2', 'state': 'IN_PLAY',
                                     'secret': 'b', 'disallowed': ['b1', 'b2']}]
         publicMsg = ['TURN', 3, 1, {'team': 2, 'player': 'jg2', 'state': 'IN_PLAY'}]
@@ -306,18 +385,21 @@ class TabooTurnManagerTest(unittest.TestCase, MsgTestLib):
         txq = asyncio.Queue()
         wordset = SupportedWordSets["test"]
 
-        team1 = self.mockPlyrTeam(txq, 1, {"sb": []})
-        team2 = self.mockPlyrTeam(txq, 2, {"jg": []})
+        team1 = mockPlyrTeam(txq, 1, {"sb": []})
+        team2 = mockPlyrTeam(txq, 2, {"jg": []})
 
         teams = {1: team1, 2: team2}
-        hostNumRounds = 1
+        hostParameters = HostParameters(numTeams=2,
+                                        turnDurationSec=30,
+                                        wordSets=["test"],
+                                        numTurns=1)
 
         allConns = Connections(txq)
         for team in teams.values():
             for ws in team.conns._wss:
                 allConns.addConn(ws)
 
-        turnMgr = TurnManager(txq, wordset, teams, hostNumRounds, allConns)
+        turnMgr = TurnManager(txq, wordset, teams, hostParameters, allConns)
 
         self.assertFalse(turnMgr.startNewTurn())
         self.assertGiTxQueueMsgs(txq, [])

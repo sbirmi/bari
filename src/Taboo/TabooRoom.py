@@ -1,4 +1,6 @@
 """Taboo room"""
+
+from enum import Enum
 import re
 
 from fwk.GamePlugin import GamePlugin
@@ -13,21 +15,38 @@ from fwk.Msg import (
 from Taboo.HostParametersMsgSrc import HostParametersMsgSrc
 from Taboo.TabooPlayer import TabooPlayer
 from Taboo.TabooTeam import TabooTeam
+from Taboo.TurnManager import TurnManager
+from Taboo.WordSets import SupportedWordSets
 
 validPlayerNameRe = re.compile("^[a-zA-Z0-9_]+$")
 
+class GameState(Enum):
+    WAITING_TO_START = 1
+    RUNNING = 2
+    GAME_OVER = 3
+
 class TabooRoom(GamePlugin):
-    def __init__(self, path, name, hostParameters):
+    def __init__(self, path, name, hostParameters, state=GameState.WAITING_TO_START):
         super(TabooRoom, self).__init__(path, name)
         self.hostParameters = hostParameters
-        self.hostParametersMsgSrc = None
+        self.state = state
+
         self.playerByWs = {} #<ws:player>
         self.teams = None # int -> Team
+        self.wordSet = SupportedWordSets[self.hostParameters.wordSets[0]]
+
+        # Initialized after queues are set up
+        self.hostParametersMsgSrc = None
+        self.turnMgr = None
 
     def initGame(self):
         self.hostParametersMsgSrc = HostParametersMsgSrc(self.conns, self.hostParameters)
         self.teams = {n: TabooTeam(self.txQueue, n)
                       for n in range(1, self.hostParameters.numTeams + 1)}
+
+        self.turnMgr = TurnManager(self.txQueue, self.wordSet,
+                                   self.teams, self.hostParameters,
+                                   self.conns)
 
     def publishGiStatus(self):
         """Invoked to update the lobby of the game instance (room) status
@@ -75,7 +94,38 @@ class TabooRoom(GamePlugin):
         if qmsg.jmsg[0] == "JOIN":
             return self.__processJoin(qmsg)
 
+        # When the last READY message is received, we should call
+        # self.turnManager.startNewWord() which picks the
+        # next player to play (but not necessarily the next word to
+        # play). We should also switch self.state == GameState.RUNNING
+
+        if qmsg.jmsg[0] == "KICKOFF":
+            return self.__processKickoff(qmsg)
+
         return False
+
+    def __processKickoff(self, qmsg):
+        ws = qmsg.initiatorWs
+
+        if len(qmsg.jmsg) != 1:
+            self.txQueue.put_nowait(ClientTxMsg(["KICKOFF-BAD", "Invalid message length"],
+                                                {ws}, initiatorWs=ws))
+            return True
+
+        if self.state != GameState.RUNNING:
+            self.txQueue.put_nowait(ClientTxMsg(["KICKOFF-BAD",
+                                                 "Game not running yet"],
+                                                 {ws}, initiatorWs=ws))
+            return True
+
+        player = self.playerByWs[ws]
+        if player != self.turnMgr.activePlayer:
+            self.txQueue.put_nowait(ClientTxMsg(["KICKOFF-BAD",
+                                                 "It is not your turn"],
+                                                 {ws}, initiatorWs=ws))
+            return True
+
+        return self.turnMgr.processKickoff(qmsg)
 
     def __processJoin(self, qmsg):
         """

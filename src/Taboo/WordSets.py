@@ -52,6 +52,9 @@ class WordSet:
             return False
         return self.data['enabled']
 
+    def areWordsAvailable(self, usedWordIdxs):
+        return len(usedWordIdxs) < self.count()
+
     def nextWord(self, usedWordIdxs):
         """
         Arguments
@@ -65,7 +68,7 @@ class WordSet:
             Map(word : str, disallowed : list[str],
                 usedWordIdxs : set(int))
         """
-        if len(usedWordIdxs) >= self.count():
+        if not self.areWordsAvailable(usedWordIdxs):
             # No more words
             return None
 
