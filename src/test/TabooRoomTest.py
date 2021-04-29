@@ -71,7 +71,7 @@ class TabooTurnTest(unittest.TestCase, MsgTestLib):
     def setUp(self):
         self.txq = asyncio.Queue()
 
-    def setUpTurn(self, turnIdx=1, wordIdx=1,
+    def setUpTurn(self, turnId=1, wordId=1,
                   secret=None, disallowed=None,
                   player=None, otherTeams=None,
                   allConns=None,
@@ -102,7 +102,7 @@ class TabooTurnTest(unittest.TestCase, MsgTestLib):
         otherTeams = [otherTeam]
         score = score or []
 
-        return Turn(turnIdx=turnIdx, wordIdx=wordIdx,
+        return Turn(turnId=turnId, wordId=wordId,
                     secret=secret, disallowed=disallowed,
                     player=player, otherTeams=otherTeams,
                     allConns=allConns,
@@ -110,6 +110,7 @@ class TabooTurnTest(unittest.TestCase, MsgTestLib):
                     score=score)
 
     def testBasic(self):
+        # pylint: disable=protected-access
         turn = self.setUpTurn()
 
         self.assertGiTxQueueMsgs(self.txq, [
@@ -124,12 +125,12 @@ class TabooTurnTest(unittest.TestCase, MsgTestLib):
                                         "disallowed": ["a1", "a2"]}],
                         {102}),
         ], anyOrder=True)
-        self.assertIsNotNone(turn.privateMsgSrc)
+        self.assertIsNotNone(turn._privateMsgSrc)
 
-        turn.state = TurnState.COMPLETED
-        turn.score = [1]
+        turn._state = TurnState.COMPLETED
+        turn._score = [1]
         turn.updateMsgs()
-        self.assertIsNone(turn.privateMsgSrc) # privateMsgSrc should be deleted
+        self.assertIsNone(turn._privateMsgSrc) # privateMsgSrc should be deleted
         self.assertGiTxQueueMsgs(self.txq, [
             ClientTxMsg(["TURN", 1, 1, {"team": 1, "player": "sb", "state": "COMPLETED",
                                         "secret": "a",
@@ -138,8 +139,8 @@ class TabooTurnTest(unittest.TestCase, MsgTestLib):
                         {101, 102, 103}),
         ], anyOrder=True)
 
-        turn.state = TurnState.DISCARDED
-        turn.score = [2]
+        turn._state = TurnState.DISCARDED
+        turn._score = [2]
         turn.updateMsgs()
         self.assertGiTxQueueMsgs(self.txq, [
             ClientTxMsg(["TURN", 1, 1, {"team": 1, "player": "sb", "state": "DISCARDED",
@@ -149,8 +150,8 @@ class TabooTurnTest(unittest.TestCase, MsgTestLib):
                         {101, 102, 103}),
         ], anyOrder=True)
 
-        turn.state = TurnState.TIMED_OUT
-        turn.score = [2]
+        turn._state = TurnState.TIMED_OUT
+        turn._score = [2]
         turn.updateMsgs()
         self.assertGiTxQueueMsgs(self.txq, [
             ClientTxMsg(["TURN", 1, 1, {"team": 1, "player": "sb", "state": "TIMED_OUT",

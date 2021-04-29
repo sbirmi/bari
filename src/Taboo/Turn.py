@@ -15,68 +15,67 @@ class TurnState(Enum):
     TIMED_OUT = 4
 
 class Turn:
-    def __init__(self, turnIdx, wordIdx,
+    def __init__(self, turnId, wordId,
                  secret, disallowed,
                  player, otherTeams, allConns,
                  state=TurnState.IN_PLAY,
                  score=None):
-        self.turnIdx = turnIdx
-        self.wordIdx = wordIdx
-        self.secret = secret
-        self.disallowed = disallowed
-        self.player = player
-        self.otherTeams = otherTeams
-        self.allConns = allConns
-        self.state = state
-        self.score = score or [] # list of teamNumbers that should be awarded points
+        self._turnId = turnId
+        self._wordId = wordId
+        self._secret = secret
+        self._disallowed = disallowed
+        self._player = player
+        self._otherTeams = otherTeams
+        self._allConns = allConns
+        self._state = state
+        self._score = score or [] # list of teamNumbers that should be awarded points
 
         # Messages are broadcast to everyone connected to the room
-        self.publicMsgSrc = MsgSrc(self.allConns)
+        self._publicMsgSrc = MsgSrc(self._allConns)
 
         # If we are in play, we have to send private messages revealing
         # The word in play to some people
-        self.privateMsgSrc = None
+        self._privateMsgSrc = None
         if state == TurnState.IN_PLAY:
-            self.privateConnsGrp = ConnectionsGroup()
-            self.privateConnsGrp.addConnections(self.player.playerConns)
-            for team in self.otherTeams:
-                self.privateConnsGrp.addConnections(team.conns)
-            self.privateMsgSrc = MsgSrc(self.privateConnsGrp)
+            privateConnsGrp = ConnectionsGroup()
+            privateConnsGrp.addConnections(self._player.playerConns)
+            for team in self._otherTeams:
+                privateConnsGrp.addConnections(team.conns)
+            self._privateMsgSrc = MsgSrc(privateConnsGrp)
 
         self.updateMsgs()
 
     def updateMsgs(self):
         """Figures out what messages to send to who based on internal state"""
-        if self.state == TurnState.IN_PLAY:
-            assert self.privateMsgSrc
+        if self._state == TurnState.IN_PLAY:
+            assert self._privateMsgSrc
 
-            msg1 = ["TURN", self.turnIdx, self.wordIdx,
-                    {"team": self.player.team.teamNumber,
-                     "player": self.player.name,
-                     "state": self.state.name}]
-            self.publicMsgSrc.setMsgs([Jmai(msg1, None)])
+            msg1 = ["TURN", self._turnId, self._wordId,
+                    {"team": self._player.team.teamNumber,
+                     "player": self._player.name,
+                     "state": self._state.name}]
+            self._publicMsgSrc.setMsgs([Jmai(msg1, None)])
 
             msg2 = msg1[:] # make a copy of msg1
             msg2[3] = dict(msg1[3]) # Make a copy of the dict (and don't update
                                     # the dictionary in msg1)
             msg2[3].update({
-                "secret": self.secret,
-                "disallowed": self.disallowed,
+                "secret": self._secret,
+                "disallowed": self._disallowed,
             })
-            self.privateMsgSrc.setMsgs([Jmai(msg2, None)])
+            self._privateMsgSrc.setMsgs([Jmai(msg2, None)])
 
             return
 
-        # If the word isn't in play, there is no private messaging needed.
-        if self.privateMsgSrc:
-            self.privateConnsGrp = None
-            self.privateMsgSrc = None
+        # If the turn isn't in play, there is no private messaging needed.
+        if self._privateMsgSrc:
+            self._privateMsgSrc = None
 
-        msg = ["TURN", self.turnIdx, self.wordIdx,
-               {"team": self.player.team.teamNumber,
-                "player": self.player.name,
-                "state": self.state.name,
-                "secret": self.secret,
-                "disallowed": self.disallowed,
-                "score": self.score}]
-        self.publicMsgSrc.setMsgs([Jmai(msg, None)])
+        msg = ["TURN", self._turnId, self._wordId,
+               {"team": self._player.team.teamNumber,
+                "player": self._player.name,
+                "state": self._state.name,
+                "secret": self._secret,
+                "disallowed": self._disallowed,
+                "score": self._score}]
+        self._publicMsgSrc.setMsgs([Jmai(msg, None)])
