@@ -1,8 +1,10 @@
 """Dynamically load all word sets from Taboo/wordsets"""
 
 import os
+import random
 import yaml
 
+from fwk.Common import Map
 from fwk.Trace import (
         Level,
         trace,
@@ -49,6 +51,31 @@ class WordSet:
             trace(Level.error, "'enabled' not found in", self.path)
             return False
         return self.data['enabled']
+
+    def nextWord(self, usedWordIdxs):
+        """
+        Arguments
+        ---------
+        usedWordIdxs : set
+            word indexes used up from self.data['words']
+
+        Returns : Map or None
+        ----------------------
+        If no words are remaining, return None. Else, return
+            Map(word : str, disallowed : list[str],
+                usedWordIdxs : set(int))
+        """
+        if len(usedWordIdxs) >= self.count():
+            # No more words
+            return None
+
+        candidateIdxs = tuple(i for i in range(self.count()) if i not in usedWordIdxs)
+        selectedIdx = random.choice(candidateIdxs)
+        selected = self.data['words'][selectedIdx]
+        word, disallowed = dict(selected).popitem()
+
+        return Map(word=word, disallowed=disallowed,
+                   usedWordIdxs=usedWordIdxs | {selectedIdx})
 
 if __name__ != "__main__": # When importing
     files = os.listdir(WORDSETS_PATH)
