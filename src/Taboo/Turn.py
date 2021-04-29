@@ -26,12 +26,11 @@ class Turn:
         self._disallowed = disallowed
         self._player = player
         self._otherTeams = otherTeams
-        self._allConns = allConns
         self._state = state
         self._score = score or [] # list of teamNumbers that should be awarded points
 
         # Messages are broadcast to everyone connected to the room
-        self._publicMsgSrc = MsgSrc(self._allConns)
+        self._publicMsgSrc = MsgSrc(allConns)
 
         # If we are in play, we have to send private messages revealing
         # The word in play to some people
