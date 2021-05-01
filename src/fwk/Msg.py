@@ -96,3 +96,14 @@ class InternalGiStatus(MsgBase):
         # pylint: disable=bad-super-call
         return super(self.__class__, self).__str__() + " jmsg=" + str(self.jmsg) + \
                 " fromPath=" + self.fromPath
+
+class TimerRequest(MsgBase):
+    def __init__(self, afterSec, cb, ctx):
+        super(TimerRequest, self).__init__(initiatorWs=None)
+        self.afterSec = afterSec
+        self.cb = cb
+        self.ctx = ctx
+
+    def __str__(self):
+        return str(super(self.__class__, self)) + " afterSec={} cb={} ctx={}".format(
+                self.afterSec, self.cb, self.ctx)
