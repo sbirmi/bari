@@ -12,7 +12,7 @@ from fwk.Trace import (
         trace,
         Level,
 )
-from Taboo.Turn import (
+from Taboo.Word import (
         Word,
         WordState,
 )

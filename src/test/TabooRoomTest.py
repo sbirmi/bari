@@ -15,7 +15,7 @@ from Taboo import TabooRoom
 from Taboo.HostParameters import HostParameters
 from Taboo.TabooPlayer import TabooPlayer
 from Taboo.TabooTeam import TabooTeam
-from Taboo.Turn import (
+from Taboo.Word import (
         Word,
         WordState,
 )
