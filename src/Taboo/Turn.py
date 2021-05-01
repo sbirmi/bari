@@ -1,4 +1,4 @@
-"""Represents a single Turn in Taboo"""
+"""Represents a single Word in a Turn in Taboo"""
 
 from enum import Enum
 
@@ -18,7 +18,7 @@ class WordState(Enum):
     DISCARDED = 3
     TIMED_OUT = 4
 
-class Turn:
+class Word:
     def __init__(self, turnId, wordId,
                  secret, disallowed,
                  player, otherTeams, allConns,
@@ -33,7 +33,7 @@ class Turn:
         self._state = state
         self._score = score or [] # list of teamNumbers that should be awarded points
 
-        trace(Level.rnd, "New Turn", str(self))
+        trace(Level.rnd, "New Word", str(self))
 
         # Messages are broadcast to everyone connected to the room
         self._publicMsgSrc = MsgSrc(allConns)
@@ -51,7 +51,7 @@ class Turn:
         self.updateMsgs()
 
     def __str__(self):
-        return "Turn({},{}) player={} secret={} state={} score={}".format(
+        return "Word({},{}) player={} secret={} state={} score={}".format(
                 self._turnId, self._wordId,
                 self._player.name,
                 self._secret,

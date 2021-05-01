@@ -13,7 +13,7 @@ from fwk.Trace import (
         Level,
 )
 from Taboo.Turn import (
-        Turn,
+        Word,
         WordState,
 )
 
@@ -30,7 +30,7 @@ class TurnManager:
                                               # has played hostParameters.numTurns
         self._allConns = allConns
 
-        self._turnById = defaultdict(list)
+        self._wordsByTurnId = defaultdict(list)
 
         self._curTurnId = 0
         self._curTurn = None # Points to the current turn in play
@@ -97,8 +97,8 @@ class TurnManager:
 
 
         # Identify current team that's playing
-        if self._turnById:
-            currentTeam = self._turnById[self._curTurnId][-1].player.team
+        if self._wordsByTurnId:
+            currentTeam = self._wordsByTurnId[self._curTurnId][-1].player.team
         else:
             currentTeam = random.choice(list(self._teams.values()))
 
@@ -146,14 +146,14 @@ class TurnManager:
         assert self.activePlayer
         self._state = TurnState.RUNNING
 
-        if self._turnById[self._curTurnId]:
+        if self._wordsByTurnId[self._curTurnId]:
             trace(Level.debug,
                   "curTurnId", self._curTurnId,
-                  "lastWord", self._turnById[self._curTurnId][-1],
-                  "state", self._turnById[self._curTurnId][-1].state)
-            assert self._turnById[self._curTurnId][-1].state != WordState.IN_PLAY
+                  "lastWord", self._wordsByTurnId[self._curTurnId][-1],
+                  "state", self._wordsByTurnId[self._curTurnId][-1].state)
+            assert self._wordsByTurnId[self._curTurnId][-1].state != WordState.IN_PLAY
 
-        nextWordId = len(self._turnById[self._curTurnId]) + 1
+        nextWordId = len(self._wordsByTurnId[self._curTurnId]) + 1
 
         # Fetch a new word
         found = self._wordSet.nextWord(self._usedWordIdxs)
@@ -166,12 +166,12 @@ class TurnManager:
         disallowed = found.disallowed
         trace(Level.rnd, "player", self.activePlayer.name, "word", secret)
 
-        # Create a new Turn
-        turn = Turn(self._curTurnId, nextWordId, secret, disallowed,
+        # Create a new Word
+        turn = Word(self._curTurnId, nextWordId, secret, disallowed,
                     self.activePlayer, [team for team in self._teams.values()
                                    if team != self.activePlayer.team],
                     self._allConns)
-        self._turnById[self._curTurnId].append(turn)
+        self._wordsByTurnId[self._curTurnId].append(turn)
 
         self._curTurn = turn
         return True

@@ -33,7 +33,6 @@ class TabooRoom(GamePlugin):
 
         self.playerByWs = {} #<ws:player>
         self.teams = None # int -> Team
-        self.wordSet = SupportedWordSets[self.hostParameters.wordSets[0]]
 
         # Initialized after queues are set up
         self.hostParametersMsgSrc = None
@@ -44,7 +43,8 @@ class TabooRoom(GamePlugin):
         self.teams = {n: TabooTeam(self.txQueue, n)
                       for n in range(1, self.hostParameters.numTeams + 1)}
 
-        self.turnMgr = TurnManager(self.txQueue, self.wordSet,
+        wordSet = SupportedWordSets[self.hostParameters.wordSets[0]]
+        self.turnMgr = TurnManager(self.txQueue, wordSet,
                                    self.teams, self.hostParameters,
                                    self.conns)
 

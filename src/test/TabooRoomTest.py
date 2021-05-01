@@ -16,7 +16,7 @@ from Taboo.HostParameters import HostParameters
 from Taboo.TabooPlayer import TabooPlayer
 from Taboo.TabooTeam import TabooTeam
 from Taboo.Turn import (
-        Turn,
+        Word,
         WordState,
 )
 from Taboo.TurnManager import TurnManager
@@ -33,7 +33,7 @@ def mockPlyrTeam(txq, teamId,
     for plyrName, conns in connsByPlayerName.items():
         plyr = TabooPlayer(txq, name=plyrName, team=team)
         for ws in conns:
-            plyr.playerConns.addConn(ws)
+            plyr.addConn(ws)
             team.conns.addConn(ws)
 
         plyr.turnsPlayed = turnsPlayedByPlayerName.get(plyrName, 0)
@@ -147,11 +147,11 @@ class TabooRoomTest(unittest.TestCase, MsgTestLib):
             ClientTxMsg(["KICKOFF-BAD", "Can't kickoff a turn"], {201}, 201),
         ])
 
-class TabooTurnTest(unittest.TestCase, MsgTestLib):
+class TabooWordTest(unittest.TestCase, MsgTestLib):
     def setUp(self):
         self.txq = asyncio.Queue()
 
-    def setUpTurn(self, turnId=1, wordId=1,
+    def setUpWord(self, turnId=1, wordId=1,
                   secret=None, disallowed=None,
                   player=None, otherTeams=None,
                   allConns=None,
@@ -173,7 +173,7 @@ class TabooTurnTest(unittest.TestCase, MsgTestLib):
         playerTeam = TabooTeam(self.txq, playerTeamNum)
         player = TabooPlayer(self.txq, name=playerName, team=playerTeam)
         for ws in playerWss:
-            player.playerConns.addConn(ws)
+            player.addConn(ws)
 
         otherTeam = TabooTeam(self.txq, otherTeamNum)
         for ws in otherTeamWss:
@@ -182,7 +182,7 @@ class TabooTurnTest(unittest.TestCase, MsgTestLib):
         otherTeams = [otherTeam]
         score = score or []
 
-        return Turn(turnId=turnId, wordId=wordId,
+        return Word(turnId=turnId, wordId=wordId,
                     secret=secret, disallowed=disallowed,
                     player=player, otherTeams=otherTeams,
                     allConns=allConns,
@@ -190,7 +190,7 @@ class TabooTurnTest(unittest.TestCase, MsgTestLib):
                     score=score)
 
     def testBasic(self):
-        turn = self.setUpTurn()
+        turn = self.setUpWord()
 
         self.assertGiTxQueueMsgs(self.txq, [
             ClientTxMsg(["TURN", 1, 1, {"team": 1, "player": "sb", "state": "IN_PLAY"}],
