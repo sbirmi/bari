@@ -12,7 +12,7 @@ MAX_TEAMS = 4
 MIN_TURN_DURATION = 30
 MAX_TURN_DURATION = 180
 
-MAX_ROUNDS = 8
+MAX_TURNS = 8
 
 class HostParameters:
     """Tracks host parameters for a game
@@ -29,14 +29,14 @@ class HostParameters:
     ctrArgs = ("numTeams",
                "turnDurationSec",
                "wordSets",
-               "numRounds",
+               "numTurns",
               )
 
     def __init__(self,
                  numTeams,
                  turnDurationSec,
                  wordSets,
-                 numRounds):
+                 numTurns):
         self.msgSrc = None
 
         if not isinstance(numTeams, int) or numTeams < MIN_TEAMS or numTeams > MAX_TEAMS:
@@ -50,8 +50,8 @@ class HostParameters:
                 not set(wordSets).issubset(SupportedWordSets)):
             raise InvalidDataException("Invalid type or wordSets", wordSets)
 
-        if (not isinstance(numRounds, int) or numRounds < 1 or numRounds > MAX_ROUNDS):
-            raise InvalidDataException("Invalid type or numRounds", numRounds)
+        if (not isinstance(numTurns, int) or numTurns < 1 or numTurns > MAX_TURNS):
+            raise InvalidDataException("Invalid type or numTurns", numTurns)
 
         vals = locals()
         self.state = Map(**{argName: vals[argName] for argName in self.ctrArgs})

@@ -11,6 +11,7 @@ Requirements
 2. websockets
 3. pyyaml
 4. pylint (recommended for development)
+5. coverage (recommended for development)
 
 
 Setup
