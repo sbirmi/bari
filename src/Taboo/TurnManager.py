@@ -8,6 +8,10 @@ from fwk.Msg import (
         ClientTxMsg,
         TimerRequest,
 )
+from fwk.MsgSrc import (
+        Jmai,
+        MsgSrc,
+)
 from fwk.Trace import (
         trace,
         Level,
@@ -18,8 +22,10 @@ from Taboo.Word import (
 )
 
 class TurnState(Enum):
+    GAME_START_WAIT = 0
     KICKOFF_WAIT = 1
     RUNNING = 2
+    GAME_OVER = 3
 
 class TurnManager:
     def __init__(self, txQueue, wordSet, teams, hostParameters, allConns):
@@ -35,8 +41,9 @@ class TurnManager:
         self._curTurnId = 0
         self._curTurn = None # Points to the current turn in play
         self._activePlayer = None
+        self._waitForKickoffMsgSrc = MsgSrc(self._allConns)
 
-        self._state = TurnState.KICKOFF_WAIT
+        self._state = TurnState.GAME_START_WAIT
         self._usedWordIdxs = set() # index of words used from self._wordSet
 
     @property
@@ -50,6 +57,19 @@ class TurnManager:
     @property
     def turnDurationSec(self):
         return self._hostParameters.turnDurationSec
+
+    def updateState(self, newState):
+        if self._state == newState:
+            return
+
+        self._state = newState
+
+        if newState == TurnState.KICKOFF_WAIT:
+            self._waitForKickoffMsgSrc.setMsgs([
+                Jmai(["WAIT-FOR-KICKOFF", self._curTurnId, self._activePlayer.name], None),
+            ])
+        else:
+            self._waitForKickoffMsgSrc.setMsgs([])
 
     def processKickoff(self, qmsg):
         """Always returns True (implies message ingested)"""
@@ -124,8 +144,8 @@ class TurnManager:
         # 1. Find next player to go. If none is found, declare end of game
         self._activePlayer = self._findNextPlayer()
         if not self._activePlayer:
-            # TODO handle game over here # pylint: disable=fixme
             trace(Level.rnd, "Can't start a new turn as no next player available")
+            self.updateState(TurnState.GAME_OVER)
             return False
 
         # 2. Start a new turn
@@ -134,8 +154,10 @@ class TurnManager:
 
         if not self._wordSet.areWordsAvailable(self._usedWordIdxs):
             trace(Level.rnd, "Words exhausted")
+            self.updateState(TurnState.GAME_OVER)
             return False
 
+        self.updateState(TurnState.KICKOFF_WAIT)
         return True
 
     def startNextWord(self):
@@ -144,7 +166,7 @@ class TurnManager:
                        (no more words available)
         """
         assert self.activePlayer
-        self._state = TurnState.RUNNING
+        self.updateState(TurnState.RUNNING)
 
         if self._wordsByTurnId[self._curTurnId]:
             trace(Level.debug,

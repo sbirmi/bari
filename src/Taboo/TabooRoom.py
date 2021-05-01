@@ -95,9 +95,9 @@ class TabooRoom(GamePlugin):
             return self.__processJoin(qmsg)
 
         # When the last READY message is received, we should call
-        # self.turnManager.startNewWord() which picks the
+        # self.turnManager.startNewTurn() which picks the
         # next player to play (but not necessarily the next word to
-        # play). We should also switch self.state == GameState.RUNNING
+        # play). We should also switch self.state = GameState.RUNNING
 
         if qmsg.jmsg[0] == "KICKOFF":
             return self.__processKickoff(qmsg)
@@ -160,7 +160,6 @@ class TabooRoom(GamePlugin):
             return True
 
         return self.joinPlayer(ws, playerName, teamNumber)
-
 
     def joinPlayer(self, ws, playerName, teamNumber):
         player = self.getPlayer(playerName)
