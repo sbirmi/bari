@@ -143,6 +143,19 @@ Server --> client
 When the turn has to be played
 
 Server --> client
+
+When the next player is decided by the TurnManager and the TurnMgr state is WAITING_FOR_KICKOFF
+```
+["TURN",
+ turn<int>,
+ wordIdx<int> = 0,
+ {"team": <int>,
+  "player": <str>,
+ }
+]
+```
+
+When KICKOFF has been received, public-msg sent to everyone for the word hen its in in play
 ```
 ["TURN",
  turn<int>,
@@ -152,7 +165,10 @@ Server --> client
   "state": IN_PLAY,
  }
 ]
+```
 
+When the word is in play, the secret word is shown only to the active player + all members of all other teams
+```
 ["TURN",
  turn<int>,
  wordIdx<int>,
@@ -163,7 +179,10 @@ Server --> client
   "state": IN_PLAY,
  }
 ]
+```
 
+When the word is completed (by discarding or scoring), the secret word + score is shown to all
+```
 ["TURN",
  turn<int>,
  wordIdx<int>,
