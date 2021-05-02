@@ -60,6 +60,7 @@ class TabooRoomTest(unittest.TestCase, MsgTestLib):
     def setUpTeamPlayer(self, env, teamId, plyrName, wss):
         for ws in wss:
             env.room.joinPlayer(ws, plyrName, teamId)
+            assert ws in env.room.teams[teamId].conns._wss
             env.room.conns.addConn(ws)
 
     def testNewGame(self):
