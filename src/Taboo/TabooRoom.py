@@ -12,6 +12,10 @@ from fwk.Msg import (
         ClientTxMsg,
         InternalGiStatus,
 )
+from fwk.MsgSrc import (
+        Jmai,
+        MsgSrc,
+)
 from Taboo.HostParametersMsgSrc import HostParametersMsgSrc
 from Taboo.TabooPlayer import TabooPlayer
 from Taboo.TabooTeam import TabooTeam
@@ -36,10 +40,13 @@ class TabooRoom(GamePlugin):
 
         # Initialized after queues are set up
         self.hostParametersMsgSrc = None
+        self.gameOverMsgSrc = None
         self.turnMgr = None
 
     def initGame(self):
         self.hostParametersMsgSrc = HostParametersMsgSrc(self.conns, self.hostParameters)
+        self.gameOverMsgSrc = MsgSrc(self.conns)
+
         self.teams = {n: TabooTeam(self.txQueue, n)
                       for n in range(1, self.hostParameters.numTeams + 1)}
 
@@ -57,6 +64,7 @@ class TabooRoom(GamePlugin):
                                             "hostParams": <dict>}]
         """
         jmsg = [{"hostParameters": self.hostParameters.toJmsg()[0],
+                 "gameState": self.state.name,
                  "clientCount": self.conns.count()}]
         self.txQueue.put_nowait(InternalGiStatus(jmsg, self.path))
 
@@ -83,6 +91,17 @@ class TabooRoom(GamePlugin):
         del self.playerByWs[ws]
         self.publishGiStatus()
 
+    def _allPlayersReady(self):
+        """Called when all players have sent the ready message
+
+        Start the first turn (pick the player) and wait for a
+        KICKOFF message from that player
+        """
+        trace(Level.game, "All players are ready, starting game")
+        assert self.state == GameState.WAITING_TO_START
+        self.state = GameState.RUNNING
+        self.turnMgr.startNewTurn()
+
     def processMsg(self, qmsg):
         """Handle messages from the queue coming to this room
 
@@ -94,17 +113,61 @@ class TabooRoom(GamePlugin):
         if qmsg.jmsg[0] == "JOIN":
             return self.__processJoin(qmsg)
 
-        # When the last READY message is received, we should call
-        # self.turnManager.startNewTurn() which picks the
-        # next player to play (but not necessarily the next word to
-        # play). We should also switch self.state = GameState.RUNNING
+        # When the last READY message is received and each team has
+        # at least 2 players, we should call self.allPlayersReady()
 
         if qmsg.jmsg[0] == "KICKOFF":
             return self.__processKickoff(qmsg)
 
+        if qmsg.jmsg[0] == "DISCARD":
+            return self.__processDiscard(qmsg)
+
         return False
 
+    def __processDiscard(self, qmsg):
+        """
+        ["DISCARD", turn<int>, wordIdx<int>]
+        """
+        ws = qmsg.initiatorWs
+
+        if len(qmsg.jmsg) != 3:
+            self.txQueue.put_nowait(ClientTxMsg(["DISCARD-BAD", "Invalid message length"],
+                                                {ws}, initiatorWs=ws))
+            return True
+
+        if (not isinstance(qmsg.jmsg[1], int)) or (not isinstance(qmsg.jmsg[2], int)):
+            self.txQueue.put_nowait(ClientTxMsg(["DISCARD-BAD", "Invalid message type"],
+                                                {ws}, initiatorWs=ws))
+            return True
+
+        if self.state != GameState.RUNNING:
+            trace(Level.play, "_processDiscard current state", self.state.name)
+            self.txQueue.put_nowait(ClientTxMsg(["DISCARD-BAD",
+                                                 "Game not running"],
+                                                 {ws}, initiatorWs=ws))
+            return True
+
+        player = self.playerByWs[ws]
+        if player != self.turnMgr.activePlayer:
+            trace(Level.play, "_processDiscard msg rcvd from", player.name if player else None,
+                              "activePlayer", self.turnMgr.activePlayer.name
+                                              if self.turnMgr.activePlayer else None)
+            self.txQueue.put_nowait(ClientTxMsg(["DISCARD-BAD",
+                                                 "It is not your turn"],
+                                                 {ws}, initiatorWs=ws))
+            return True
+
+        gameover = self.turnMgr.processDiscard(qmsg)
+        if gameover:
+            self._gameOver()
+            return True
+
+        return True
+
     def __processKickoff(self, qmsg):
+        """
+        ["KICKOFF"]
+        """
         ws = qmsg.initiatorWs
 
         if len(qmsg.jmsg) != 1:
@@ -113,13 +176,17 @@ class TabooRoom(GamePlugin):
             return True
 
         if self.state != GameState.RUNNING:
+            trace(Level.play, "_processDiscard current state", self.state.name)
             self.txQueue.put_nowait(ClientTxMsg(["KICKOFF-BAD",
-                                                 "Game not running yet"],
+                                                 "Game not running"],
                                                  {ws}, initiatorWs=ws))
             return True
 
         player = self.playerByWs[ws]
         if player != self.turnMgr.activePlayer:
+            trace(Level.play, "_processDiscard msg rcvd from", player.name if player else None,
+                              "activePlayer", self.turnMgr.activePlayer.name
+                                              if self.turnMgr.activePlayer else None)
             self.txQueue.put_nowait(ClientTxMsg(["KICKOFF-BAD",
                                                  "It is not your turn"],
                                                  {ws}, initiatorWs=ws))
@@ -207,3 +274,12 @@ class TabooRoom(GamePlugin):
         if not team:
             return min(self.teams.values(), key=lambda t: len(t.members))
         return team
+
+    def _gameOver(self):
+        trace(Level.game, "Game Over")
+        self.state = GameState.GAME_OVER
+        self.gameOverMsgSrc.setMsgs([
+            Jmai(["GAME-OVER"], None), # TODO: add winning team IDs # pylint: disable=fixme
+        ])
+
+        self.publishGiStatus()

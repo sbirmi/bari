@@ -66,6 +66,10 @@ class Word:
     def state(self):
         return self._state
 
+    @property
+    def wordId(self):
+        return self._wordId
+
     def updateMsgs(self):
         """Figures out what messages to send to who based on internal state"""
         if self._state == WordState.IN_PLAY:
@@ -100,3 +104,10 @@ class Word:
                 "disallowed": self._disallowed,
                 "score": self._score}]
         self._publicMsgSrc.setMsgs([Jmai(msg, None)])
+
+    def doDiscard(self):
+        """The word is being discarded"""
+        trace(Level.play, "Discarding", str(self))
+        self._score = [team.teamNumber for team in self._otherTeams]
+        self._state = WordState.DISCARDED
+        self.updateMsgs()
