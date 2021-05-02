@@ -34,8 +34,6 @@ def mockPlyrTeam(txq, teamId,
         plyr = TabooPlayer(txq, name=plyrName, team=team)
         for ws in conns:
             plyr.addConn(ws)
-            team.conns.addConn(ws)
-
         plyr.turnsPlayed = turnsPlayedByPlayerName.get(plyrName, 0)
     return team
 
@@ -62,7 +60,6 @@ class TabooRoomTest(unittest.TestCase, MsgTestLib):
     def setUpTeamPlayer(self, env, teamId, plyrName, wss):
         for ws in wss:
             env.room.joinPlayer(ws, plyrName, teamId)
-            assert ws not in env.room.teams[teamId].conns._wss
             env.room.teams[teamId].conns.addConn(ws) # HACK
             env.room.conns.addConn(ws)
 
