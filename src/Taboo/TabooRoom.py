@@ -99,6 +99,9 @@ class TabooRoom(GamePlugin):
         # next player to play (but not necessarily the next word to
         # play). We should also switch self.state = GameState.RUNNING
 
+        if qmsg.jmsg[0] == "READY":
+            return self.__processReady(qmsg)
+
         if qmsg.jmsg[0] == "KICKOFF":
             return self.__processKickoff(qmsg)
 
@@ -127,6 +130,37 @@ class TabooRoom(GamePlugin):
 
         return self.turnMgr.processKickoff(qmsg)
 
+    def __processReady(self, qmsg):
+        """
+        ["READY"]
+        """
+        ws = qmsg.initiatorWs
+
+        if len(qmsg.jmsg) != 1:
+            self.txQueue.put_nowait(ClientTxMsg(["READY-BAD", "Invalid message length"],
+                                                {ws}, initiatorWs=ws))
+            return True
+
+        # No need to do this, right?
+        #if self.state != GameState.WAITING_TO_START:
+        #    self.txQueue.put_nowait(ClientTxMsg(["READY-BAD", "Game already started/ended"],
+        #                            {ws}, initiatorWs=ws))
+        #    return True
+
+        player = self.playerByWs.get(ws, None)
+        if not player:
+            self.txQueue.put_nowait(ClientTxMsg(["READY-BAD", "Join first"],
+                                    {ws}, initiatorWs=ws))
+            return True
+
+        player.ready = True
+        if all(t.ready() for t in self.teams.values()):
+            self.turnMgr.startNewTurn()
+            self.state = GameState.RUNNING
+            trace(Level.info, "Game started")
+
+        return True
+
     def __processJoin(self, qmsg):
         """
         ["JOIN", playerName, team:int={0..T}]
@@ -154,7 +188,7 @@ class TabooRoom(GamePlugin):
             return True
 
         if (not isinstance(teamNumber, int) or
-            teamNumber < 0 or teamNumber >= self.hostParameters.numTeams):
+            teamNumber < 0 or teamNumber > self.hostParameters.numTeams):
             self.txQueue.put_nowait(ClientTxMsg(["JOIN-BAD", "Invalid team number", teamNumber],
                                                 {ws}, initiatorWs=ws))
             return True
@@ -174,9 +208,9 @@ class TabooRoom(GamePlugin):
 
         #new join-request for an existing player will be accepted
         #but we ignore the requested team and associate the player to the original team
-        if teamNumber != team.teamNumber:
+        if teamNumber != player.team.teamNumber:
             trace(Level.warn, "Player {} forced to join their "
-                "original team {}".format(player.name, team.teamNumber))
+                "original team {}".format(player.name, player.team.teamNumber))
 
         self.__finalizeJoin(ws, player)
         return True

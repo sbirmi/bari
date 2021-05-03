@@ -16,6 +16,7 @@ class TabooPlayer:
         team.addPlayer(self)
         self.team = team
         self.turnsPlayed = turnsPlayed
+        self.__ready = False
 
     def __str__(self):
         return "TabooPlayer({}) teamId={}, turnsPlayed={}".format(self.name,
@@ -24,6 +25,16 @@ class TabooPlayer:
 
     def addConn(self, ws):
         self.playerConns.addConn(ws)
+        self.team.conns.addConn(ws)
 
     def delConn(self, ws):
         self.playerConns.delConn(ws)
+        self.team.conns.delConn(ws)
+
+    @property
+    def ready(self):
+        return self.__ready
+
+    @ready.setter
+    def ready(self, flag):
+        self.__ready = flag

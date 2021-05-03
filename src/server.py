@@ -21,6 +21,7 @@ from fwk.ServerQueueTask import (
         giByPath,
         giRxMsg,
         registerGameClass,
+        timerAdd,
         txQueue,
         wsPathAdd,
         wsPathRemove,
@@ -34,6 +35,7 @@ from fwk.Msg import (
         InternalRegisterGi,
         ClientRxMsg,
         ClientTxMsg,
+        TimerRequest,
 )
 from fwk.MsgType import (
         MTYPE_ERROR,
@@ -129,6 +131,10 @@ async def giTxQueue(queue):
 
         if isinstance(qmsg, InternalGiStatus):
             giRxMsg(LOBBY_PATH, qmsg)
+            continue
+
+        if isinstance(qmsg, TimerRequest):
+            await timerAdd(qmsg)
             continue
 
         try:
