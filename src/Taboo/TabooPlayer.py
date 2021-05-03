@@ -24,6 +24,8 @@ class TabooPlayer:
 
     def addConn(self, ws):
         self.playerConns.addConn(ws)
+        self.team.conns.addConn(ws)
 
     def delConn(self, ws):
         self.playerConns.delConn(ws)
+        self.team.conns.delConn(ws)
