@@ -21,7 +21,7 @@ from Taboo.Word import (
         WordState,
 )
 
-class TurnState(Enum):
+class TurnMgrState(Enum):
     GAME_START_WAIT = 0
     KICKOFF_WAIT = 1
     RUNNING = 2
@@ -43,7 +43,7 @@ class TurnManager:
         self._activePlayer = None
         self._waitForKickoffMsgSrc = MsgSrc(self._allConns)
 
-        self._state = TurnState.GAME_START_WAIT
+        self._state = TurnMgrState.GAME_START_WAIT
         self._usedWordIdxs = set() # index of words used from self._wordSet
 
     @property
@@ -64,7 +64,7 @@ class TurnManager:
 
         self._state = newState
 
-        if newState == TurnState.KICKOFF_WAIT:
+        if newState == TurnMgrState.KICKOFF_WAIT:
             self._waitForKickoffMsgSrc.setMsgs([
                 Jmai(["WAIT-FOR-KICKOFF", self._curTurnId, self._activePlayer.name], None),
             ])
@@ -85,7 +85,7 @@ class TurnManager:
         """
         ws = qmsg.initiatorWs
 
-        if self._state != TurnState.RUNNING:
+        if self._state != TurnMgrState.RUNNING:
             trace(Level.play, "processDiscard turn state", self._state.name)
             self._txQueue.put_nowait(ClientTxMsg(["DISCARD-BAD",
                                                   "Can't discard right now"],
@@ -133,7 +133,7 @@ class TurnManager:
         """Always returns True (implies message ingested)"""
         ws = qmsg.initiatorWs
 
-        if self._state != TurnState.KICKOFF_WAIT:
+        if self._state != TurnMgrState.KICKOFF_WAIT:
             self._txQueue.put_nowait(ClientTxMsg(["KICKOFF-BAD",
                                                   "Can't kickoff a turn"],
                                                   {ws}, initiatorWs=ws))
@@ -206,7 +206,7 @@ class TurnManager:
         self._activePlayer = self._findNextPlayer()
         if not self._activePlayer:
             trace(Level.rnd, "Can't start a new turn as no next player available")
-            self.updateState(TurnState.GAME_OVER)
+            self.updateState(TurnMgrState.GAME_OVER)
             return False
 
         # 2. Start a new turn
@@ -215,10 +215,10 @@ class TurnManager:
 
         if not self._wordSet.areWordsAvailable(self._usedWordIdxs):
             trace(Level.rnd, "Words exhausted")
-            self.updateState(TurnState.GAME_OVER)
+            self.updateState(TurnMgrState.GAME_OVER)
             return False
 
-        self.updateState(TurnState.KICKOFF_WAIT)
+        self.updateState(TurnMgrState.KICKOFF_WAIT)
         return True
 
     def startNextWord(self):
@@ -227,7 +227,7 @@ class TurnManager:
                        (no more words available)
         """
         assert self.activePlayer
-        self.updateState(TurnState.RUNNING)
+        self.updateState(TurnMgrState.RUNNING)
 
         if self._wordsByTurnId[self._curTurnId]:
             trace(Level.debug,
