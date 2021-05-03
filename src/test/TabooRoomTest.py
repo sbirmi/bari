@@ -34,8 +34,6 @@ def mockPlyrTeam(txq, teamId,
         plyr = TabooPlayer(txq, name=plyrName, team=team)
         for ws in conns:
             plyr.addConn(ws)
-            team.conns.addConn(ws)
-
         plyr.turnsPlayed = turnsPlayedByPlayerName.get(plyrName, 0)
     return team
 
@@ -62,8 +60,7 @@ class TabooRoomTest(unittest.TestCase, MsgTestLib):
     def setUpTeamPlayer(self, env, teamId, plyrName, wss):
         for ws in wss:
             env.room.joinPlayer(ws, plyrName, teamId)
-            assert ws not in env.room.teams[teamId].conns._wss
-            env.room.teams[teamId].conns.addConn(ws) # HACK
+            assert ws in env.room.teams[teamId].conns._wss
             env.room.conns.addConn(ws)
 
     def testNewGame(self):
@@ -97,6 +94,96 @@ class TabooRoomTest(unittest.TestCase, MsgTestLib):
                  "clientCount": 1}
             ], "taboo:1"),
         ], anyOrder=True)
+
+    def testJoin(self):
+        env = self.setUpTabooRoom()
+        ws1 = 101
+        env.room.processConnect(ws1)
+        self.drainGiTxQueue(env.txq)
+
+        env.room.processMsg(ClientRxMsg(["JOIN"], ws1))
+        self.assertGiTxQueueMsgs(env.txq, [
+            ClientTxMsg(["JOIN-BAD", "Invalid message length"], {ws1}, ws1),
+        ])
+
+        env.room.processMsg(ClientRxMsg(["JOIN", "sb1", -1], ws1))
+        self.assertGiTxQueueMsgs(env.txq, [
+            ClientTxMsg(["JOIN-BAD", "Invalid team number", -1], {ws1}, ws1),
+        ])
+
+        env.room.processMsg(ClientRxMsg(["JOIN", "sb1", 3], ws1))
+        self.assertGiTxQueueMsgs(env.txq, [
+            ClientTxMsg(["JOIN-BAD", "Invalid team number", 3], {ws1}, ws1),
+        ])
+
+        env.room.processMsg(ClientRxMsg(["JOIN", "#$H", 1], ws1))
+        self.assertGiTxQueueMsgs(env.txq, [
+            ClientTxMsg(["JOIN-BAD", "Invalid player name", "#$H"], {ws1}, ws1),
+        ])
+
+        #Good join - specified team number
+        env.room.processMsg(ClientRxMsg(["JOIN", "sb1", 1], ws1))
+        self.assertGiTxQueueMsgs(env.txq, [
+            ClientTxMsg(["JOIN-OKAY", "sb1", 1], {ws1}, ws1),
+        ])
+
+        #Join more players
+        self.setUpTeamPlayer(env, 1, "sb2", [102])
+        self.setUpTeamPlayer(env, 2, "jg1", [201])
+        self.setUpTeamPlayer(env, 2, "jg2", [202])
+        #Join one more player in team 2
+        self.setUpTeamPlayer(env, 2, "jg3", [203])
+        self.drainGiTxQueue(env.txq)
+
+        #A random-team join (team = 0) should lead to "water-fill"
+        ws2 = 1001
+        env.room.processConnect(ws2)
+        self.drainGiTxQueue(env.txq)
+        env.room.processMsg(ClientRxMsg(["JOIN", "xx", 0], ws2))
+        self.assertGiTxQueueMsgs(env.txq, [
+            ClientTxMsg(["JOIN-OKAY", "xx", 1], {ws2}, ws2),
+        ])
+
+        #Now run a bunch of new JOINs on team 2
+        self.setUpTeamPlayer(env, 2, "jg4", [204])
+        self.setUpTeamPlayer(env, 2, "jg5", [205])
+
+        # The next two random JOINs should be assgnd team 1
+        ws2 = ws2 + 1
+        env.room.processConnect(ws2)
+        self.drainGiTxQueue(env.txq)
+        env.room.processMsg(ClientRxMsg(["JOIN", "yy", 0], ws2))
+        self.assertGiTxQueueMsgs(env.txq, [
+            ClientTxMsg(["JOIN-OKAY", "yy", 1], {ws2}, ws2),
+        ])
+
+        ws2 = ws2 + 1
+        env.room.processConnect(ws2)
+        self.drainGiTxQueue(env.txq)
+        env.room.processMsg(ClientRxMsg(["JOIN", "zz", 0], ws2))
+        self.assertGiTxQueueMsgs(env.txq, [
+            ClientTxMsg(["JOIN-OKAY", "zz", 1], {ws2}, ws2),
+        ])
+
+        #A JOIN from an unrecognized ws ofc leads to assert
+        with self.assertRaises(AssertionError):
+            env.room.processMsg(ClientRxMsg(["JOIN", "zz", 0], ws2+1))
+
+        #A re-JOIN from a plyr forces it to its original team
+        env.room.processConnect(2001)
+        self.drainGiTxQueue(env.txq)
+        env.room.processMsg(ClientRxMsg(["JOIN", "jg1", 1], 2001))
+        self.assertGiTxQueueMsgs(env.txq, [
+            ClientTxMsg(["JOIN-OKAY", "jg1", 2], {2001}, 2001),
+        ])
+
+        #A re-JOIN from a plyr forces it to its original team
+        env.room.processConnect(2002)
+        self.drainGiTxQueue(env.txq)
+        env.room.processMsg(ClientRxMsg(["JOIN", "jg1", 0], 2002))
+        self.assertGiTxQueueMsgs(env.txq, [
+            ClientTxMsg(["JOIN-OKAY", "jg1", 2], {2002}, 2002),
+        ])
 
     def testKickoff(self):
         env = self.setUpTabooRoom()
@@ -148,6 +235,56 @@ class TabooRoomTest(unittest.TestCase, MsgTestLib):
         self.assertGiTxQueueMsgs(env.txq, [
             ClientTxMsg(["KICKOFF-BAD", "Can't kickoff a turn"], {201}, 201),
         ])
+
+    def testReady(self):
+        env = self.setUpTabooRoom()
+        self.drainGiTxQueue(env.txq)
+
+        env.room.state = TabooRoom.GameState.WAITING_TO_START
+
+        env.room.processMsg(ClientRxMsg(["READY", "stuff"], 101))
+        self.assertGiTxQueueMsgs(env.txq, [
+            ClientTxMsg(["READY-BAD", "Invalid message length"], {101}, 101),
+        ])
+
+        env.room.processMsg(ClientRxMsg(["READY"], 101))
+        self.assertGiTxQueueMsgs(env.txq, [
+            ClientTxMsg(["READY-BAD", "Join first"], {101}, 101),
+        ])
+
+        self.setUpTeamPlayer(env, 1, "sb1", [101])
+        self.setUpTeamPlayer(env, 1, "sb2", [102])
+        self.setUpTeamPlayer(env, 2, "jg1", [201])
+        self.setUpTeamPlayer(env, 2, "jg2", [202])
+        self.drainGiTxQueue(env.txq)
+
+        env.room.processMsg(ClientRxMsg(["READY"], 101))
+        self.assertGiTxQueueMsgs(env.txq, [])
+        self.assertEqual(env.room.state, TabooRoom.GameState.WAITING_TO_START)
+        env.room.processMsg(ClientRxMsg(["READY"], 102))
+        self.assertGiTxQueueMsgs(env.txq, [])
+        self.assertEqual(env.room.state, TabooRoom.GameState.WAITING_TO_START)
+        env.room.processMsg(ClientRxMsg(["READY"], 201))
+        self.assertGiTxQueueMsgs(env.txq, [])
+        self.assertEqual(env.room.state, TabooRoom.GameState.WAITING_TO_START)
+
+        #If a player sends READY multiple times, it will be silently ignored
+        env.room.processMsg(ClientRxMsg(["READY"], 101))
+        self.assertGiTxQueueMsgs(env.txq, [])
+
+        #READY from last of the (initial) players trigger start of the game
+        env.room.processMsg(ClientRxMsg(["READY"], 202))
+        self.assertGiTxQueueMsgs(env.txq, [
+            ClientTxMsg(["WAIT-FOR-KICKOFF", 1, "jg1"], {101, 102, 201, 202}, None),
+        ])
+        self.assertEqual(env.room.state, TabooRoom.GameState.RUNNING)
+
+        #A late-joinee gets into the game the same way as the initial players
+        #i.e., JOIN followed by READY
+        self.setUpTeamPlayer(env, 1, "sb3", [103])
+        self.drainGiTxQueue(env.txq)
+        env.room.processMsg(ClientRxMsg(["READY"], 103))
+        self.assertGiTxQueueMsgs(env.txq, [])
 
     def testDiscard(self):
         env = self.setUpTabooRoom()
