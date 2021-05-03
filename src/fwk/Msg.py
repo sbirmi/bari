@@ -105,5 +105,5 @@ class TimerRequest(MsgBase):
         self.ctx = ctx
 
     def __str__(self):
-        return str(super(self.__class__, self)) + " afterSec={} cb={} ctx={}".format(
-                self.afterSec, self.cb, self.ctx)
+        return super(TimerRequest, self).__str__() + " afterSec={} cb={}.{} ctx={}".format(
+                self.afterSec, self.cb.__module__, self.cb.__func__.__name__, self.ctx)
