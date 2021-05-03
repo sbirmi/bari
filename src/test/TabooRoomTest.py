@@ -212,6 +212,7 @@ class TabooRoomTest(unittest.TestCase, MsgTestLib):
         env.room.turnMgr.startNewTurn()
         env.room.processMsg(ClientRxMsg(["KICKOFF"], 101))
         self.assertGiTxQueueMsgs(env.txq, [
+            ClientTxMsg(["WAIT-FOR-KICKOFF", 1, "jg1"], {101, 102, 201, 202}, None),
             ClientTxMsg(["KICKOFF-BAD", "It is not your turn"], {101}, 101),
         ])
 
@@ -418,7 +419,9 @@ class TabooTurnManagerTest(unittest.TestCase, MsgTestLib):
         self.assertGiTxQueueMsgs(txq, [])
 
         self.assertTrue(turnMgr.startNewTurn())
-        self.assertGiTxQueueMsgs(txq, [])
+        self.assertGiTxQueueMsgs(txq, [
+            ClientTxMsg(["WAIT-FOR-KICKOFF", 1, "jg1"], {101, 102, 201, 202}, None),
+        ])
 
         self.assertTrue(turnMgr.startNextWord())
         secretMsg = ['TURN', 1, 1, {'team': 2, 'player': 'jg1', 'state': 'IN_PLAY',
@@ -474,6 +477,7 @@ class TabooTurnManagerTest(unittest.TestCase, MsgTestLib):
         turnMgr = TurnManager(txq, wordset, teams, hostParameters, allConns)
 
         self.assertTrue(turnMgr.startNewTurn())
+        self.drainGiTxQueue(txq)
 
         self.assertTrue(turnMgr.startNextWord())
         secretMsg = ['TURN', 1, 1, {'team': 2, 'player': 'jg1', 'state': 'IN_PLAY',
@@ -487,7 +491,9 @@ class TabooTurnManagerTest(unittest.TestCase, MsgTestLib):
 
         turnMgr._curTurn.player.turnsPlayed += 1
         self.assertTrue(turnMgr.startNewTurn())
-        self.assertGiTxQueueMsgs(txq, [])
+        self.assertGiTxQueueMsgs(txq, [
+            ClientTxMsg(["WAIT-FOR-KICKOFF", 2, "sb1"], {101, 102, 201, 202}, None),
+        ], anyOrder=True)
 
         self.assertTrue(turnMgr.startNextWord())
         secretMsg = ['TURN', 2, 1, {'team': 1, 'player': 'sb1', 'state': 'IN_PLAY',
@@ -501,6 +507,9 @@ class TabooTurnManagerTest(unittest.TestCase, MsgTestLib):
 
         turnMgr._curTurn.player.turnsPlayed += 1
         self.assertTrue(turnMgr.startNewTurn())
+        self.assertGiTxQueueMsgs(txq, [
+            ClientTxMsg(["WAIT-FOR-KICKOFF", 3, "jg2"], {101, 102, 201, 202}, None),
+        ], anyOrder=True)
 
         self.assertTrue(turnMgr.startNextWord())
         secretMsg = ['TURN', 3, 1, {'team': 2, 'player': 'jg2', 'state': 'IN_PLAY',
