@@ -34,3 +34,7 @@ class TabooTeam:
             Return None if no such player found
         """
         return self.members.get(playerName, None)
+
+    def ready(self):
+        return (len(self.members) > 0 and
+                    all(plyr.ready for plyr in self.members.values()))
