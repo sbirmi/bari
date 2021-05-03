@@ -280,6 +280,7 @@ class TabooRoomTest(unittest.TestCase, MsgTestLib):
         self.drainGiTxQueue(env.txq)
         env.room.processMsg(ClientRxMsg(["READY"], 103))
         self.assertGiTxQueueMsgs(env.txq, [])
+
 class TabooWordTest(unittest.TestCase, MsgTestLib):
     def setUp(self):
         self.txq = asyncio.Queue()
