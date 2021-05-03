@@ -142,7 +142,7 @@ Server --> client
 
 Server --> client
 
-When KICKOFF has been received, public-msg sent to everyone for the word hen its in in play
+When KICKOFF has been received, public-msg sent to everyone for the word then its in in play
 ```
 ["TURN",
  turn<int>,
