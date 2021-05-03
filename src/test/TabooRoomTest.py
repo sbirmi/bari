@@ -72,6 +72,7 @@ class TabooRoomTest(unittest.TestCase, MsgTestLib):
                                     "turnDurationSec": 30,
                                     "wordSets": ["test"],
                                     "numTurns": 1},
+                 "gameState": "WAITING_TO_START",
                  "clientCount": 0}
             ], "taboo:1"),
         ], anyOrder=True)
@@ -89,6 +90,7 @@ class TabooRoomTest(unittest.TestCase, MsgTestLib):
                                     "turnDurationSec": 30,
                                     "wordSets": ["test"],
                                     "numTurns": 1},
+                 "gameState": "WAITING_TO_START",
                  "clientCount": 1}
             ], "taboo:1"),
         ], anyOrder=True)
@@ -194,7 +196,7 @@ class TabooRoomTest(unittest.TestCase, MsgTestLib):
 
         env.room.processMsg(ClientRxMsg(["KICKOFF"], 101))
         self.assertGiTxQueueMsgs(env.txq, [
-            ClientTxMsg(["KICKOFF-BAD", "Game not running yet"], {101}, 101),
+            ClientTxMsg(["KICKOFF-BAD", "Game not running"], {101}, 101),
         ])
 
         env.room.state = TabooRoom.GameState.RUNNING
@@ -272,7 +274,9 @@ class TabooRoomTest(unittest.TestCase, MsgTestLib):
 
         #READY from last of the (initial) players trigger start of the game
         env.room.processMsg(ClientRxMsg(["READY"], 202))
-        self.assertGiTxQueueMsgs(env.txq, [])
+        self.assertGiTxQueueMsgs(env.txq, [
+            ClientTxMsg(["WAIT-FOR-KICKOFF", 1, "jg1"], {101, 102, 201, 202}, None),
+        ])
         self.assertEqual(env.room.state, TabooRoom.GameState.RUNNING)
 
         #A late-joinee gets into the game the same way as the initial players
@@ -281,6 +285,103 @@ class TabooRoomTest(unittest.TestCase, MsgTestLib):
         self.drainGiTxQueue(env.txq)
         env.room.processMsg(ClientRxMsg(["READY"], 103))
         self.assertGiTxQueueMsgs(env.txq, [])
+
+    def testDiscard(self):
+        env = self.setUpTabooRoom()
+        self.drainGiTxQueue(env.txq)
+
+        env.room.processMsg(ClientRxMsg(["DISCARD"], 101))
+        self.assertGiTxQueueMsgs(env.txq, [
+            ClientTxMsg(["DISCARD-BAD", "Invalid message length"], {101}, 101),
+        ])
+
+        env.room.processMsg(ClientRxMsg(["DISCARD", "foo", 1], 101))
+        self.assertGiTxQueueMsgs(env.txq, [
+            ClientTxMsg(["DISCARD-BAD", "Invalid message type"], {101}, 101),
+        ])
+
+        env.room.processMsg(ClientRxMsg(["DISCARD", 1, 1], 101))
+        self.assertGiTxQueueMsgs(env.txq, [
+            ClientTxMsg(["DISCARD-BAD", "Game not running"], {101}, 101),
+        ])
+
+        self.setUpTeamPlayer(env, 1, "sb1", [101])
+        self.setUpTeamPlayer(env, 1, "sb2", [102])
+        self.setUpTeamPlayer(env, 2, "jg1", [201])
+        self.setUpTeamPlayer(env, 2, "jg2", [202])
+        env.room._allPlayersReady()
+        self.drainGiTxQueue(env.txq)
+
+        env.room.processMsg(ClientRxMsg(["DISCARD", 1, 1], 101))
+        self.assertGiTxQueueMsgs(env.txq, [
+            ClientTxMsg(["DISCARD-BAD", "It is not your turn"], {101}, 101),
+        ])
+
+        env.room.processMsg(ClientRxMsg(["DISCARD", 1, 1], 201))
+        self.assertGiTxQueueMsgs(env.txq, [
+            ClientTxMsg(["DISCARD-BAD", "Can't discard right now"], {201}, 201),
+        ])
+
+        # KICKOFF turn
+        env.room.processMsg(ClientRxMsg(["KICKOFF"], 201))
+        self.drainGiTxQueue(env.txq)
+
+        env.room.processMsg(ClientRxMsg(["DISCARD", 0, 1], 201))
+        self.assertGiTxQueueMsgs(env.txq, [
+            ClientTxMsg(["DISCARD-BAD", "Discarding invalid turn"], {201}, 201),
+        ])
+
+        env.room.processMsg(ClientRxMsg(["DISCARD", 1, 0], 201))
+        self.assertGiTxQueueMsgs(env.txq, [
+            ClientTxMsg(["DISCARD-BAD", "Discarding invalid word"], {201}, 201),
+        ])
+
+        env.room.processMsg(ClientRxMsg(["DISCARD", 1, 1], 201))
+        self.assertGiTxQueueMsgs(env.txq, [
+            ClientTxMsg(["TURN", 1, 1, {"team": 2, "player": "jg1", "state": "DISCARDED",
+                                        "secret": "c",
+                                        "disallowed": ["c1", "c2"],
+                                        "score": [1]}],
+                        {101, 102, 201, 202}),
+            ClientTxMsg(["TURN", 1, 2, {"team": 2, "player": "jg1", "state": "IN_PLAY"}],
+                        {101, 102, 201, 202}),
+            ClientTxMsg(["TURN", 1, 2, {"team": 2, "player": "jg1", "state": "IN_PLAY",
+                                        "secret": "a",
+                                        "disallowed": ["a1", "a2"]}],
+                        {201}),
+            ClientTxMsg(["TURN", 1, 2, {"team": 2, "player": "jg1", "state": "IN_PLAY",
+                                        "secret": "a",
+                                        "disallowed": ["a1", "a2"]}],
+                        {101, 102}),
+        ], anyOrder=True)
+
+        env.room.processMsg(ClientRxMsg(["DISCARD", 1, 2], 201))
+        self.drainGiTxQueue(env.txq)
+
+        env.room.processMsg(ClientRxMsg(["DISCARD", 1, 3], 201))
+        self.assertGiTxQueueMsgs(env.txq, [
+            ClientTxMsg(["TURN", 1, 3, {"team": 2, "player": "jg1", "state": "DISCARDED",
+                                        "secret": "b",
+                                        "disallowed": ["b1", "b2"],
+                                        "score": [1]}],
+                        {101, 102, 201, 202}),
+            ClientTxMsg(["GAME-OVER"],
+                        {101, 102, 201, 202}),
+            InternalGiStatus([
+                {"hostParameters": {"numTeams": 2,
+                                    "turnDurationSec": 30,
+                                    "wordSets": ["test"],
+                                    "numTurns": 1},
+                 "gameState": "GAME_OVER",
+                 "clientCount": 4}
+            ], "taboo:1"),
+        ], anyOrder=True)
+
+        env.room.processMsg(ClientRxMsg(["DISCARD", 1, 3], 201))
+        self.assertGiTxQueueMsgs(env.txq, [
+            ClientTxMsg(["DISCARD-BAD", "Game not running"],
+                        {201}, 201),
+        ])
 
 class TabooWordTest(unittest.TestCase, MsgTestLib):
     def setUp(self):

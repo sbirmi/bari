@@ -71,6 +71,64 @@ class TurnManager:
         else:
             self._waitForKickoffMsgSrc.setMsgs([])
 
+    # ---------------------------------
+    # Message handlers
+
+    def processDiscard(self, qmsg):
+        """
+        Guarantees from the caller
+        1. qmsg.jmsg is of right length and right type
+        2. Correct player is invoking this
+        3. Game is not over yet
+
+        returns True if game over, else False
+        """
+        ws = qmsg.initiatorWs
+
+        if self._state != TurnState.RUNNING:
+            trace(Level.play, "processDiscard turn state", self._state.name)
+            self._txQueue.put_nowait(ClientTxMsg(["DISCARD-BAD",
+                                                  "Can't discard right now"],
+                                                 {ws}, initiatorWs=ws))
+            return False
+
+        if qmsg.jmsg[1] != self._curTurnId:
+            self._txQueue.put_nowait(ClientTxMsg(["DISCARD-BAD",
+                                                  "Discarding invalid turn"],
+                                                 {ws}, initiatorWs=ws))
+            return False
+
+        assert self._curTurnId in self._wordsByTurnId, (
+                "Since the turn is in running state, {} must exist in {}".format(
+                    self._curTurnId,
+                    self._wordsByTurnId.keys()))
+
+        assert self._wordsByTurnId[self._curTurnId], (
+                "Since the turn is in running state, there must be at least 1 word in {}".format(
+                    self._wordsByTurnId[self._curTurnId]))
+
+        lastWord = self._wordsByTurnId[self._curTurnId][-1]
+
+        if qmsg.jmsg[2] != lastWord.wordId:
+            self._txQueue.put_nowait(ClientTxMsg(["DISCARD-BAD",
+                                                  "Discarding invalid word"],
+                                                 {ws}, initiatorWs=ws))
+            return False
+
+        if lastWord.state != WordState.IN_PLAY:
+            self._txQueue.put_nowait(ClientTxMsg(["DISCARD-BAD",
+                                                  "The word is no longer in play"],
+                                                 {ws}, initiatorWs=ws))
+            return False
+
+        lastWord.doDiscard()
+        if not self.startNextWord():
+            # game over
+            trace(Level.play, "Last word discarded, no more words. Game over")
+            return True
+
+        return False
+
     def processKickoff(self, qmsg):
         """Always returns True (implies message ingested)"""
         ws = qmsg.initiatorWs
@@ -88,6 +146,9 @@ class TurnManager:
 
         assert self.startNextWord() is True, "Must always be able to start a new word"
         return True
+
+    # ---------------------------------
+    # Turn and word management
 
     def timerExpiredCb(self, ctx):
         """This method is invoked when the timer fires"""
