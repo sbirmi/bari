@@ -53,7 +53,7 @@ class TabooRoom(GamePlugin):
         wordSet = SupportedWordSets[self.hostParameters.wordSets[0]]
         self.turnMgr = TurnManager(self.txQueue, wordSet,
                                    self.teams, self.hostParameters,
-                                   self.conns)
+                                   self.conns, self._gameOver)
 
     def publishGiStatus(self):
         """Invoked to update the lobby of the game instance (room) status
@@ -113,9 +113,6 @@ class TabooRoom(GamePlugin):
         if qmsg.jmsg[0] == "JOIN":
             return self.__processJoin(qmsg)
 
-        # When the last READY message is received and each team has
-        # at least 2 players, we should call self.allPlayersReady()
-
         if qmsg.jmsg[0] == "READY":
             return self.__processReady(qmsg)
 
@@ -160,12 +157,7 @@ class TabooRoom(GamePlugin):
                                                  {ws}, initiatorWs=ws))
             return True
 
-        gameover = self.turnMgr.processDiscard(qmsg)
-        if gameover:
-            self._gameOver()
-            return True
-
-        return True
+        return self.turnMgr.processDiscard(qmsg)
 
     def __processKickoff(self, qmsg):
         """
