@@ -105,9 +105,12 @@ class Word:
                 "score": self._score}]
         self._publicMsgSrc.setMsgs([Jmai(msg, None)])
 
-    def doDiscard(self):
-        """The word is being discarded"""
-        trace(Level.play, "Discarding", str(self))
-        self._score = [team.teamNumber for team in self._otherTeams]
-        self._state = WordState.DISCARDED
+    def resolve(self, state):
+        """Resolve the word as DISCARDED, COMPLETED, or TIMED_OUT"""
+        trace(Level.play, "state", state.name)
+        if state == WordState.COMPLETED:
+            self._score = [self._player.team.teamNumber]
+        else:
+            self._score = [team.teamNumber for team in self._otherTeams]
+        self._state = state
         self.updateMsgs()

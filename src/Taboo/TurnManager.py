@@ -28,13 +28,30 @@ class TurnMgrState(Enum):
     GAME_OVER = 3
 
 class TurnManager:
-    def __init__(self, txQueue, wordSet, teams, hostParameters, allConns):
+    def __init__(self, txQueue, wordSet, teams, hostParameters, allConns,
+                 gameOverCb):
+        """
+        Arguments
+        ---------
+        gameOverCb : asyncio.Queue
+        wordSet : WordSet
+        teams : dict[int: TabooTeam]
+        hostParameters : HostParameters
+        allConns : Connections
+        gameOverCb : function (no args)
+            Normally, the return value from TurnManager can signal to the game room
+            if the game gets over. However, when the timer expires (timer handler
+            is invoked from the Bari core), we need a way to call just the gameOver
+            function in the Room. An ugly way is to pass the whole room here which
+            I am avoiding by passing in gameOverCb instead.
+        """
         self._txQueue = txQueue
         self._wordSet = wordSet
         self._teams = teams
         self._hostParameters = hostParameters # Stop the game when every live player
                                               # has played hostParameters.numTurns
         self._allConns = allConns
+        self._gameOverCb = gameOverCb
 
         self._wordsByTurnId = defaultdict(list)
 
@@ -81,7 +98,7 @@ class TurnManager:
         2. Correct player is invoking this
         3. Game is not over yet
 
-        returns True if game over, else False
+        Always returns True (message is ingested)
         """
         ws = qmsg.initiatorWs
 
@@ -90,13 +107,13 @@ class TurnManager:
             self._txQueue.put_nowait(ClientTxMsg(["DISCARD-BAD",
                                                   "Can't discard right now"],
                                                  {ws}, initiatorWs=ws))
-            return False
+            return True
 
         if qmsg.jmsg[1] != self._curTurnId:
             self._txQueue.put_nowait(ClientTxMsg(["DISCARD-BAD",
                                                   "Discarding invalid turn"],
                                                  {ws}, initiatorWs=ws))
-            return False
+            return True
 
         assert self._curTurnId in self._wordsByTurnId, (
                 "Since the turn is in running state, {} must exist in {}".format(
@@ -113,21 +130,21 @@ class TurnManager:
             self._txQueue.put_nowait(ClientTxMsg(["DISCARD-BAD",
                                                   "Discarding invalid word"],
                                                  {ws}, initiatorWs=ws))
-            return False
+            return True
 
         if lastWord.state != WordState.IN_PLAY:
             self._txQueue.put_nowait(ClientTxMsg(["DISCARD-BAD",
                                                   "The word is no longer in play"],
                                                  {ws}, initiatorWs=ws))
-            return False
+            return True
 
-        lastWord.doDiscard()
+        lastWord.resolve(WordState.DISCARDED)
         if not self.startNextWord():
             # game over
             trace(Level.play, "Last word discarded, no more words. Game over")
-            return True
+            self._gameOverCb()
 
-        return False
+        return True
 
     def processKickoff(self, qmsg):
         """Always returns True (implies message ingested)"""
@@ -152,7 +169,35 @@ class TurnManager:
 
     def timerExpiredCb(self, ctx):
         """This method is invoked when the timer fires"""
-        trace(Level.info, "Timer fired", ctx)
+        trace(Level.rnd, "Timer fired", ctx)
+
+        if self._state == TurnMgrState.GAME_OVER:
+            trace(Level.info, "Timer fired but game is already over. Nothing to do")
+            return
+
+        assert isinstance(ctx, dict)
+        assert "turnId" in ctx
+
+        if self._curTurnId != ctx["turnId"]:
+            trace(Level.warn, "Timer fired for turn", ctx["turnId"],
+                  "but turnMgr is on turn", self._curTurnId)
+            return
+
+        assert self._state == TurnMgrState.RUNNING, \
+               "Turn must be running when the timer fires"
+
+        lastWord = self._wordsByTurnId[self._curTurnId][-1]
+
+        if lastWord.state != WordState.IN_PLAY:
+            trace(Level.error, "The last word should be in play. This is unexpected")
+            return
+
+        lastWord.resolve(WordState.TIMED_OUT)
+        turnStarted = self.startNewTurn()
+        if not turnStarted:
+            # Game over
+            trace(Level.play, "Couldn't start a new turn. Game over")
+            self._gameOverCb()
 
     def _findNextPlayer(self):
         """
