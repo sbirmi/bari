@@ -268,9 +268,11 @@ class TabooRoomTest(unittest.TestCase, MsgTestLib):
         self.assertGiTxQueueMsgs(env.txq, [])
         self.assertEqual(env.room.state, TabooRoom.GameState.WAITING_TO_START)
 
-        #If a player sends READY multiple times, it will be silently ignored
+        #If a player sends READY multiple times, it is replied with a READY-BAD
         env.room.processMsg(ClientRxMsg(["READY"], 101))
-        self.assertGiTxQueueMsgs(env.txq, [])
+        self.assertGiTxQueueMsgs(env.txq, [
+            ClientTxMsg(['READY-BAD', 'Already ready'], {101}, 101)
+        ])
 
         #READY from last of the (initial) players trigger start of the game
         env.room.processMsg(ClientRxMsg(["READY"], 202))
@@ -279,12 +281,13 @@ class TabooRoomTest(unittest.TestCase, MsgTestLib):
         ])
         self.assertEqual(env.room.state, TabooRoom.GameState.RUNNING)
 
-        #A late-joinee gets into the game the same way as the initial players
-        #i.e., JOIN followed by READY
+        #A late-joinee is connected in READY state when it joins
         self.setUpTeamPlayer(env, 1, "sb3", [103])
         self.drainGiTxQueue(env.txq)
         env.room.processMsg(ClientRxMsg(["READY"], 103))
-        self.assertGiTxQueueMsgs(env.txq, [])
+        self.assertGiTxQueueMsgs(env.txq, [
+            ClientTxMsg(['READY-BAD', 'Already ready'], {103}, 103)
+        ])
 
     def testDiscard(self):
         env = self.setUpTabooRoom()

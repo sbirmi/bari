@@ -36,5 +36,13 @@ class TabooTeam:
         return self.members.get(playerName, None)
 
     def ready(self):
-        return (len(self.members) > 0 and
-                    all(plyr.ready for plyr in self.members.values()))
+        """ Returns true if team has enough ready players to start the game"""
+        if len(self.members) < 2:
+            trace(Level.info, "Team", self.teamNumber, "has",
+                len(self.members), "(less than two) players")
+            return False
+
+        if all(plyr.ready for plyr in self.members.values()):
+            return True
+        trace(Level.info, "Team", self.teamNumber, "some players are not ready")
+        return False

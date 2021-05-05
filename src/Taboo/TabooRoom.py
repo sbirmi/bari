@@ -208,7 +208,6 @@ class TabooRoom(GamePlugin):
                                                 {ws}, initiatorWs=ws))
             return True
 
-        # No need to do this, right?
         #if self.state != GameState.WAITING_TO_START:
         #    self.txQueue.put_nowait(ClientTxMsg(["READY-BAD", "Game already started/ended"],
         #                            {ws}, initiatorWs=ws))
@@ -217,6 +216,11 @@ class TabooRoom(GamePlugin):
         player = self.playerByWs.get(ws, None)
         if not player:
             self.txQueue.put_nowait(ClientTxMsg(["READY-BAD", "Join first"],
+                                    {ws}, initiatorWs=ws))
+            return True
+
+        if player.ready:
+            self.txQueue.put_nowait(ClientTxMsg(["READY-BAD", "Already ready"],
                                     {ws}, initiatorWs=ws))
             return True
 
@@ -269,6 +273,8 @@ class TabooRoom(GamePlugin):
         if not player:
             team = self.__getTeam(teamNumber)
             player = TabooPlayer(self.txQueue, playerName, team)
+            #A late-joinee joins in ready state
+            player.ready = self.state != GameState.WAITING_TO_START
             self.__finalizeJoin(ws, player)
             #self.processEvent(PlayerJoin(player))
             return True
