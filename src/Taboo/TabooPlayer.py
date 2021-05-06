@@ -38,3 +38,6 @@ class TabooPlayer:
     @ready.setter
     def ready(self, flag):
         self.__ready = flag
+
+    def numConns(self):
+        return self.playerConns.count()

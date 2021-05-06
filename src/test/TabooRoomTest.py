@@ -73,7 +73,8 @@ class TabooRoomTest(unittest.TestCase, MsgTestLib):
                                     "wordSets": ["test"],
                                     "numTurns": 1},
                  "gameState": "WAITING_TO_START",
-                 "clientCount": 0}
+                 "clientCount": {1: {}, 2: {}},
+                 "winners": []}
             ], "taboo:1"),
         ], anyOrder=True)
 
@@ -91,7 +92,9 @@ class TabooRoomTest(unittest.TestCase, MsgTestLib):
                                     "wordSets": ["test"],
                                     "numTurns": 1},
                  "gameState": "WAITING_TO_START",
-                 "clientCount": 1}
+                 "clientCount": {1: {}, 2: {}},
+                 "winners":[]
+                }
             ], "taboo:1"),
         ], anyOrder=True)
 
@@ -354,14 +357,16 @@ class TabooRoomTest(unittest.TestCase, MsgTestLib):
                      'score': [2]}]
         self.assertGiTxQueueMsgs(env.txq, [
             ClientTxMsg(publicMsg, {101, 102, 201, 202}),
-            ClientTxMsg(["GAME-OVER"], {101, 102, 201, 202}),
+            ClientTxMsg(["GAME-OVER", []], {101, 102, 201, 202}),
             InternalGiStatus([
                 {"hostParameters": {"numTeams": 2,
                                     "turnDurationSec": 30,
                                     "wordSets": ["test"],
                                     "numTurns": 1},
                  "gameState": "GAME_OVER",
-                 "clientCount": 4}
+                 "clientCount": {1: {'sb1': 1, 'sb2': 1}, 2: {'jg1': 1, 'jg2': 1}},
+                 "winners": []
+                }
             ], "taboo:1"),
         ], anyOrder=True)
 
@@ -448,7 +453,7 @@ class TabooRoomTest(unittest.TestCase, MsgTestLib):
                                         "disallowed": ["b1", "b2"],
                                         "score": [1]}],
                         {101, 102, 201, 202}),
-            ClientTxMsg(["GAME-OVER"],
+            ClientTxMsg(["GAME-OVER", []],
                         {101, 102, 201, 202}),
             InternalGiStatus([
                 {"hostParameters": {"numTeams": 2,
@@ -456,7 +461,9 @@ class TabooRoomTest(unittest.TestCase, MsgTestLib):
                                     "wordSets": ["test"],
                                     "numTurns": 1},
                  "gameState": "GAME_OVER",
-                 "clientCount": 4}
+                 "clientCount": {1: {'sb1': 1, 'sb2': 1}, 2: {'jg1': 1, 'jg2': 1}},
+                 "winners": []
+                }
             ], "taboo:1"),
         ], anyOrder=True)
 

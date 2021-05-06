@@ -65,13 +65,13 @@ Server --> Lobby
 
 ```
 ["GAME-STATUS", <path:str>, {"gameState": <str>,    WAITING_FOR_GAME_TO_START, WAITING_FOR_KICKOFF, TURN, GAME_OVER
-                             "clientCount": <str>,
-                             "spectatorCount": <int>,
+                             "clientCount": {teamId<int>:{plyrName<str>:clientCount<int>}},
                              "hostParams": <dict>,
-                             "winners": [
-                                winnerTeam<int>,
-                                winnerTeam<int>,
-                             ]}]
+                             "winners": [winnerTeam<int>,winnerTeam<int>,...]
+                             }
+]
+
+"winners" = [] if "gameState" != GAME_OVER else [i.teamNumber for i in winner_team_list]
 ```
 
 ## Game over
