@@ -93,13 +93,13 @@ class TurnManager:
 
     def __validateCompletedOrDiscard(self, qmsg):
         """ Validates [COMPLETED|DISCARD, turn<int>, wordIdx<int>]
-        Replies a DISCARD-BAD or COMPLETED-BAD if the message is 
+        Replies a DISCARD-BAD or COMPLETED-BAD if the message is
         received at wrong turn state
 
         Returns True iff message is valid
         """
         msgType = qmsg.jmsg[0]
-        assert msgType == "DISCARD" or msgType == "COMPLETED"
+        assert msgType in ("DISCARD", "COMPLETED")
         badReplyType = "{}-BAD".format(msgType)
 
         ws = qmsg.initiatorWs
@@ -151,12 +151,12 @@ class TurnManager:
 
         Always returns True (message is ingested)
         """
-        
+
         if not self.__validateCompletedOrDiscard(qmsg):
             return True
 
         lastWord = self._wordsByTurnId[self._curTurnId][-1]
-        wordState = (WordState.COMPLETED if qmsg.jmsg[0] == "COMPLETED" 
+        wordState = (WordState.COMPLETED if qmsg.jmsg[0] == "COMPLETED"
                         else WordState.DISCARDED)
         lastWord.resolve(wordState)
 

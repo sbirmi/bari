@@ -135,7 +135,7 @@ class TabooRoom(GamePlugin):
         Returns True iff message format is valid
         """
         msgType = qmsg.jmsg[0]
-        assert msgType == "DISCARD" or msgType == "COMPLETED"
+        assert msgType in ("DISCARD", "COMPLETED")
         badReplyType = "{}-BAD".format(msgType)
 
         ws = qmsg.initiatorWs
@@ -159,8 +159,9 @@ class TabooRoom(GamePlugin):
 
         player = self.playerByWs[ws]
         if player != self.turnMgr.activePlayer:
-            trace(Level.play, "_process{} msg rcvd from".format(msgType), player.name if player else None,
-                              "activePlayer", self.turnMgr.activePlayer.name
+            trace(Level.play, "_process{} msg rcvd from".format(msgType),
+                                player.name if player else None,
+                                "activePlayer", self.turnMgr.activePlayer.name
                                               if self.turnMgr.activePlayer else None)
             self.txQueue.put_nowait(ClientTxMsg([badReplyType,
                                                  "It is not your turn"],
@@ -173,7 +174,6 @@ class TabooRoom(GamePlugin):
         """
         ["DISCARD|COMPLETED", turn<int>, wordIdx<int>]
         """
-        ws = qmsg.initiatorWs
         if not self.__valdiateCompletedOrDiscard(qmsg):
             return True
         return self.turnMgr.processCompletedOrDiscard(qmsg)
