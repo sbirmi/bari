@@ -142,6 +142,7 @@ class TurnManager:
         if not self.startNextWord():
             # game over
             trace(Level.play, "Last word discarded, no more words. Game over")
+            self.activePlayer.incTurnsPlayed()
             self._gameOverCb()
 
         return True
@@ -192,11 +193,14 @@ class TurnManager:
             trace(Level.error, "The last word should be in play. This is unexpected")
             return
 
+        self.activePlayer.incTurnsPlayed()
+
         lastWord.resolve(WordState.TIMED_OUT)
         turnStarted = self.startNewTurn()
         if not turnStarted:
             # Game over
             trace(Level.play, "Couldn't start a new turn. Game over")
+            self.updateState(TurnMgrState.GAME_OVER)
             self._gameOverCb()
 
     def _findNextPlayer(self):

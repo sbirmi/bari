@@ -317,6 +317,7 @@ class TabooRoomTest(unittest.TestCase, MsgTestLib):
             ClientTxMsg(secretMsg, {101, 102}),
             ClientTxMsg(publicMsg, {101, 102, 201, 202}),
         ], anyOrder=True)
+        self.assertEqual(env.room.teams[2].members['jg1'].turnsPlayed, 0)
 
         # Invalid turnId
         env.room.turnMgr.timerExpiredCb({"turnId": 5})
@@ -330,6 +331,7 @@ class TabooRoomTest(unittest.TestCase, MsgTestLib):
             ClientTxMsg(publicMsg, {101, 102, 201, 202}),
             ClientTxMsg(["WAIT-FOR-KICKOFF", 2, "sb1"], {101, 102, 201, 202}, None),
         ], anyOrder=True)
+        self.assertEqual(env.room.teams[2].members['jg1'].turnsPlayed, 1)
 
         # KICKOFF new turn, discard 1st word, let timer expire on the last word
         env.room.processMsg(ClientRxMsg(["KICKOFF"], 101))
@@ -364,10 +366,12 @@ class TabooRoomTest(unittest.TestCase, MsgTestLib):
                  "clientCount": 4}
             ], "taboo:1"),
         ], anyOrder=True)
+        self.assertEqual(env.room.teams[1].members['sb1'].turnsPlayed, 1)
 
         # Test timer fire after the game is over
         env.room.turnMgr.timerExpiredCb({"turnId": 2})
         self.assertGiTxQueueMsgs(env.txq, [])
+        self.assertEqual(env.room.teams[1].members['sb1'].turnsPlayed, 1)
 
     def testDiscard(self):
         env = self.setUpTabooRoom()
@@ -437,6 +441,7 @@ class TabooRoomTest(unittest.TestCase, MsgTestLib):
                                         "disallowed": ["a1", "a2"]}],
                         {101, 102}),
         ], anyOrder=True)
+        self.assertEqual(env.room.teams[2].members['jg1'].turnsPlayed, 0)
 
         env.room.processMsg(ClientRxMsg(["DISCARD", 1, 2], 201))
         self.drainGiTxQueue(env.txq)
@@ -459,6 +464,7 @@ class TabooRoomTest(unittest.TestCase, MsgTestLib):
                  "clientCount": 4}
             ], "taboo:1"),
         ], anyOrder=True)
+        self.assertEqual(env.room.teams[2].members['jg1'].turnsPlayed, 1)
 
         env.room.processMsg(ClientRxMsg(["DISCARD", 1, 3], 201))
         self.assertGiTxQueueMsgs(env.txq, [

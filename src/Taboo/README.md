@@ -45,6 +45,35 @@ Team: [0=auto, 1..T]
    correct team
 ```
 
+
+During the game:
+```
+Turn # / interestighostParameters
+
+       Count down timer   // when the first start of turn is received, UI should start its own timer
+
+         Secret Word
+    
+      Disallowed word 1
+      Disallowed word 2
+
+
+[  Score  ]    [  Discard/Fail  ]
+
+
+Score card at the bottom
+
+-----------------------------------------------------------
+Turn num   Word    Result   | Team 1  | Team 2 | Team 3
+  N      | Foo   |          |  +1
+         | Bar   |          |             +1      +1
+-----------------------------------------------------------
+  1      | Lorem |
+-----------------------------
+
+```
+
+
 ---
 
 # Lobby
