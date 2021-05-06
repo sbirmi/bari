@@ -122,45 +122,61 @@ class TabooRoom(GamePlugin):
         if qmsg.jmsg[0] == "KICKOFF":
             return self.__processKickoff(qmsg)
 
-        if qmsg.jmsg[0] == "DISCARD":
-            return self.__processDiscard(qmsg)
+        if qmsg.jmsg[0] == "DISCARD" or qmsg.jmsg[0] == "COMPLETED":
+            return self.__processCompletedOrDiscard(qmsg)
 
         return False
 
-    def __processDiscard(self, qmsg):
+    def __valdiateCompletedOrDiscard(self, qmsg):
+        """ Validates [COMPLETED|DISCARD, turn<int>, wordIdx<int>]
+        Replies a DISCARD-BAD or COMPLETED-BAD if the message is incorrect,
+        or if the message is received at wrong game state
+
+        Returns True iff message format is valid
         """
-        ["DISCARD", turn<int>, wordIdx<int>]
-        """
+        msgType = qmsg.jmsg[0]
+        assert msgType in ("DISCARD", "COMPLETED")
+        badReplyType = "{}-BAD".format(msgType)
+
         ws = qmsg.initiatorWs
 
         if len(qmsg.jmsg) != 3:
-            self.txQueue.put_nowait(ClientTxMsg(["DISCARD-BAD", "Invalid message length"],
+            self.txQueue.put_nowait(ClientTxMsg([badReplyType, "Invalid message length"],
                                                 {ws}, initiatorWs=ws))
-            return True
+            return False
 
         if (not isinstance(qmsg.jmsg[1], int)) or (not isinstance(qmsg.jmsg[2], int)):
-            self.txQueue.put_nowait(ClientTxMsg(["DISCARD-BAD", "Invalid message type"],
+            self.txQueue.put_nowait(ClientTxMsg([badReplyType, "Invalid message type"],
                                                 {ws}, initiatorWs=ws))
-            return True
+            return False
 
         if self.state != GameState.RUNNING:
-            trace(Level.play, "_processDiscard current state", self.state.name)
-            self.txQueue.put_nowait(ClientTxMsg(["DISCARD-BAD",
+            trace(Level.play, "_process{} current state".format(msgType), self.state.name)
+            self.txQueue.put_nowait(ClientTxMsg([badReplyType,
                                                  "Game not running"],
                                                  {ws}, initiatorWs=ws))
-            return True
+            return False
 
         player = self.playerByWs[ws]
         if player != self.turnMgr.activePlayer:
-            trace(Level.play, "_processDiscard msg rcvd from", player.name if player else None,
-                              "activePlayer", self.turnMgr.activePlayer.name
+            trace(Level.play, "_process{} msg rcvd from".format(msgType),
+                                player.name if player else None,
+                                "activePlayer", self.turnMgr.activePlayer.name
                                               if self.turnMgr.activePlayer else None)
-            self.txQueue.put_nowait(ClientTxMsg(["DISCARD-BAD",
+            self.txQueue.put_nowait(ClientTxMsg([badReplyType,
                                                  "It is not your turn"],
                                                  {ws}, initiatorWs=ws))
-            return True
+            return False
 
-        return self.turnMgr.processDiscard(qmsg)
+        return True
+
+    def __processCompletedOrDiscard(self, qmsg):
+        """
+        ["DISCARD|COMPLETED", turn<int>, wordIdx<int>]
+        """
+        if not self.__valdiateCompletedOrDiscard(qmsg):
+            return True
+        return self.turnMgr.processCompletedOrDiscard(qmsg)
 
     def __processKickoff(self, qmsg):
         """

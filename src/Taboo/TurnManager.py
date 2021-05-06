@@ -91,29 +91,31 @@ class TurnManager:
     # ---------------------------------
     # Message handlers
 
-    def processDiscard(self, qmsg):
-        """
-        Guarantees from the caller
-        1. qmsg.jmsg is of right length and right type
-        2. Correct player is invoking this
-        3. Game is not over yet
+    def __validateCompletedOrDiscard(self, qmsg):
+        """ Validates [COMPLETED|DISCARD, turn<int>, wordIdx<int>]
+        Replies a DISCARD-BAD or COMPLETED-BAD if the message is
+        received at wrong turn state
 
-        Always returns True (message is ingested)
+        Returns True iff message is valid
         """
+        msgType = qmsg.jmsg[0]
+        assert msgType in ("DISCARD", "COMPLETED")
+        badReplyType = "{}-BAD".format(msgType)
+
         ws = qmsg.initiatorWs
 
         if self._state != TurnMgrState.RUNNING:
-            trace(Level.play, "processDiscard turn state", self._state.name)
-            self._txQueue.put_nowait(ClientTxMsg(["DISCARD-BAD",
-                                                  "Can't discard right now"],
+            trace(Level.play, "process{} turn state".format(msgType), self._state.name)
+            self._txQueue.put_nowait(ClientTxMsg([badReplyType,
+                                                  "Can't {} right now".format(msgType)],
                                                  {ws}, initiatorWs=ws))
-            return True
+            return False
 
         if qmsg.jmsg[1] != self._curTurnId:
-            self._txQueue.put_nowait(ClientTxMsg(["DISCARD-BAD",
-                                                  "Discarding invalid turn"],
+            self._txQueue.put_nowait(ClientTxMsg([badReplyType,
+                                                  "invalid turn"],
                                                  {ws}, initiatorWs=ws))
-            return True
+            return False
 
         assert self._curTurnId in self._wordsByTurnId, (
                 "Since the turn is in running state, {} must exist in {}".format(
@@ -127,21 +129,40 @@ class TurnManager:
         lastWord = self._wordsByTurnId[self._curTurnId][-1]
 
         if qmsg.jmsg[2] != lastWord.wordId:
-            self._txQueue.put_nowait(ClientTxMsg(["DISCARD-BAD",
-                                                  "Discarding invalid word"],
+            self._txQueue.put_nowait(ClientTxMsg([badReplyType,
+                                                  "invalid word"],
                                                  {ws}, initiatorWs=ws))
-            return True
+            return False
 
         if lastWord.state != WordState.IN_PLAY:
-            self._txQueue.put_nowait(ClientTxMsg(["DISCARD-BAD",
+            self._txQueue.put_nowait(ClientTxMsg([badReplyType,
                                                   "The word is no longer in play"],
                                                  {ws}, initiatorWs=ws))
+            return False
+
+        return True
+
+    def processCompletedOrDiscard(self, qmsg):
+        """
+        Guarantees from the caller
+        1. qmsg.jmsg is of right length and right type
+        2. Correct player is invoking this
+        3. Game is not over yet
+
+        Always returns True (message is ingested)
+        """
+
+        if not self.__validateCompletedOrDiscard(qmsg):
             return True
 
-        lastWord.resolve(WordState.DISCARDED)
+        lastWord = self._wordsByTurnId[self._curTurnId][-1]
+        wordState = (WordState.COMPLETED if qmsg.jmsg[0] == "COMPLETED"
+                        else WordState.DISCARDED)
+        lastWord.resolve(wordState)
+
         if not self.startNextWord():
             # game over
-            trace(Level.play, "Last word discarded, no more words. Game over")
+            trace(Level.play, "Last word discarded/completed, no more words. Game over")
             self.activePlayer.incTurnsPlayed()
             self._gameOverCb()
 
