@@ -113,7 +113,7 @@ class TurnManager:
 
         if qmsg.jmsg[1] != self._curTurnId:
             self._txQueue.put_nowait(ClientTxMsg([badReplyType,
-                                                  "invalid turn"],
+                                                  "Invalid turn"],
                                                  {ws}, initiatorWs=ws))
             return False
 
@@ -130,7 +130,7 @@ class TurnManager:
 
         if qmsg.jmsg[2] != lastWord.wordId:
             self._txQueue.put_nowait(ClientTxMsg([badReplyType,
-                                                  "invalid word"],
+                                                  "Invalid word"],
                                                  {ws}, initiatorWs=ws))
             return False
 

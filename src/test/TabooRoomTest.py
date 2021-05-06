@@ -420,12 +420,12 @@ class TabooRoomTest(unittest.TestCase, MsgTestLib):
 
         env.room.processMsg(ClientRxMsg(["DISCARD", 0, 1], 201))
         self.assertGiTxQueueMsgs(env.txq, [
-            ClientTxMsg(["DISCARD-BAD", "invalid turn"], {201}, 201),
+            ClientTxMsg(["DISCARD-BAD", "Invalid turn"], {201}, 201),
         ])
 
         env.room.processMsg(ClientRxMsg(["DISCARD", 1, 0], 201))
         self.assertGiTxQueueMsgs(env.txq, [
-            ClientTxMsg(["DISCARD-BAD", "invalid word"], {201}, 201),
+            ClientTxMsg(["DISCARD-BAD", "Invalid word"], {201}, 201),
         ])
 
         env.room.processMsg(ClientRxMsg(["DISCARD", 1, 1], 201))
@@ -521,12 +521,12 @@ class TabooRoomTest(unittest.TestCase, MsgTestLib):
 
         env.room.processMsg(ClientRxMsg(["COMPLETED", 0, 1], 201))
         self.assertGiTxQueueMsgs(env.txq, [
-            ClientTxMsg(["COMPLETED-BAD", "invalid turn"], {201}, 201),
+            ClientTxMsg(["COMPLETED-BAD", "Invalid turn"], {201}, 201),
         ])
 
         env.room.processMsg(ClientRxMsg(["COMPLETED", 1, 0], 201))
         self.assertGiTxQueueMsgs(env.txq, [
-            ClientTxMsg(["COMPLETED-BAD", "invalid word"], {201}, 201),
+            ClientTxMsg(["COMPLETED-BAD", "Invalid word"], {201}, 201),
         ])
 
         env.room.processMsg(ClientRxMsg(["COMPLETED", 1, 1], 201))
