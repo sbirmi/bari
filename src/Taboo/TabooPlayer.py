@@ -39,5 +39,8 @@ class TabooPlayer:
     def ready(self, flag):
         self.__ready = flag
 
-    def incTurnsPlayed( self ):
+    def incTurnsPlayed(self):
         self.turnsPlayed += 1
+
+    def numConns(self):
+        return self.playerConns.count()

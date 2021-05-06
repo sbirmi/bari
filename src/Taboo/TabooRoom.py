@@ -59,13 +59,16 @@ class TabooRoom(GamePlugin):
         """Invoked to update the lobby of the game instance (room) status
 
                ["GAME-STATUS", <path:str>, {"gameState": <str>,
-                                            "clientCount": <str>,
-                                            "spectatorCount": <int>,
-                                            "hostParams": <dict>}]
+                                            "clientCount": {
+                                                teamId<int>:{plyrName<str>:clientCount<int>}
+                                            },
+                                            "hostParams": <dict>,
+                                            "winners":[winnerTeam<int>,...]}]
         """
         jmsg = [{"hostParameters": self.hostParameters.toJmsg()[0],
                  "gameState": self.state.name,
-                 "clientCount": self.conns.count()}]
+                 "clientCount": self._clientInfo(),
+                "winners": self._winnerInfo()}]
         self.txQueue.put_nowait(InternalGiStatus(jmsg, self.path))
 
     def postQueueSetup(self):
@@ -311,7 +314,20 @@ class TabooRoom(GamePlugin):
         trace(Level.game, "Game Over")
         self.state = GameState.GAME_OVER
         self.gameOverMsgSrc.setMsgs([
-            Jmai(["GAME-OVER"], None), # TODO: add winning team IDs # pylint: disable=fixme
+            Jmai(["GAME-OVER", self._winnerInfo()], None),
         ])
 
         self.publishGiStatus()
+
+    def _clientInfo(self):
+        return {tmNr:
+                    {plyr.name:plyr.numConns()
+                      for plyr in tm.members.values()
+                    }
+                    for (tmNr, tm) in self.teams.items()
+                }
+
+    def _winnerInfo(self):
+        if self.state == GameState.GAME_OVER:
+            return []  # TODO: add winning team IDs # pylint: disable=fixme
+        return []
