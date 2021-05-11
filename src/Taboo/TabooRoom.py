@@ -51,7 +51,7 @@ class TabooRoom(GamePlugin):
                       for n in range(1, self.hostParameters.numTeams + 1)}
 
         wordSet = SupportedWordSets[self.hostParameters.wordSets[0]]
-        self.turnMgr = TurnManager(self.txQueue, wordSet,
+        self.turnMgr = TurnManager(self.path, self.txQueue, wordSet,
                                    self.teams, self.hostParameters,
                                    self.conns, self._gameOver)
 
@@ -127,7 +127,7 @@ class TabooRoom(GamePlugin):
 
         return False
 
-    def __valdiateCompletedOrDiscard(self, qmsg):
+    def __validateCompletedOrDiscard(self, qmsg):
         """ Validates [COMPLETED|DISCARD, turn<int>, wordIdx<int>]
         Replies a DISCARD-BAD or COMPLETED-BAD if the message is incorrect,
         or if the message is received at wrong game state
@@ -174,7 +174,7 @@ class TabooRoom(GamePlugin):
         """
         ["DISCARD|COMPLETED", turn<int>, wordIdx<int>]
         """
-        if not self.__valdiateCompletedOrDiscard(qmsg):
+        if not self.__validateCompletedOrDiscard(qmsg):
             return True
         return self.turnMgr.processCompletedOrDiscard(qmsg)
 

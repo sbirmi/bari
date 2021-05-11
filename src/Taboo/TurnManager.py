@@ -28,7 +28,7 @@ class TurnMgrState(Enum):
     GAME_OVER = 3
 
 class TurnManager:
-    def __init__(self, txQueue, wordSet, teams, hostParameters, allConns,
+    def __init__(self, path, txQueue, wordSet, teams, hostParameters, allConns,
                  gameOverCb):
         """
         Arguments
@@ -45,6 +45,7 @@ class TurnManager:
             function in the Room. An ugly way is to pass the whole room here which
             I am avoiding by passing in gameOverCb instead.
         """
+        self._path = path
         self._txQueue = txQueue
         self._wordSet = wordSet
         self._teams = teams
@@ -61,7 +62,6 @@ class TurnManager:
         self._waitForKickoffMsgSrc = MsgSrc(self._allConns)
 
         self._state = TurnMgrState.GAME_START_WAIT
-        self._usedWordIdxs = set() # index of words used from self._wordSet
 
     @property
     def activePlayer(self):
@@ -151,7 +151,6 @@ class TurnManager:
 
         Always returns True (message is ingested)
         """
-
         if not self.__validateCompletedOrDiscard(qmsg):
             return True
 
@@ -283,7 +282,7 @@ class TurnManager:
         self._curTurnId += 1
         self._curTurn = None # No word selected to start
 
-        if not self._wordSet.areWordsAvailable(self._usedWordIdxs):
+        if not self._wordSet.areWordsAvailable(self._path):
             trace(Level.rnd, "Words exhausted")
             self.updateState(TurnMgrState.GAME_OVER)
             return False
@@ -309,12 +308,11 @@ class TurnManager:
         nextWordId = len(self._wordsByTurnId[self._curTurnId]) + 1
 
         # Fetch a new word
-        found = self._wordSet.nextWord(self._usedWordIdxs)
+        found = self._wordSet.nextWord(self._path)
         if not found:
             trace(Level.rnd, "Can't start a new turn as no word available")
             # Ran out of words
             return False
-        self._usedWordIdxs = found.usedWordIdxs
         secret = found.word
         disallowed = found.disallowed
         trace(Level.rnd, "player", self.activePlayer.name, "word", secret)
