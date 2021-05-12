@@ -2,7 +2,6 @@ import datetime
 import inspect
 import os
 import sys
-import websockets
 
 class Level:
     error = 0
@@ -14,6 +13,7 @@ class Level:
     msg = 6
     debug = 7
     conn = 8
+    db = 9
 
     strep = {
         error: "ERR",
@@ -25,6 +25,7 @@ class Level:
         msg: "MSG",
         debug: "DEBUG",
         conn: "CONN",
+        db: "DB",
     }
 
 # TRACE_LEVELS
@@ -38,13 +39,8 @@ TRACE_LEVELS = {Level.error, Level.warn,
                 Level.info,
                 Level.msg,
                 #Level.debug,
-                Level.conn}
-
-def strep(obj):
-    if isinstance(obj, websockets.server.WebSocketServerProtocol):
-        return obj.bari_name
-    return str(obj)
-
+                Level.conn,
+                Level.db}
 
 def trace(lvl, *msg):
     if TRACE_LEVELS is None:
@@ -60,5 +56,5 @@ def trace(lvl, *msg):
     framedesc = "%s:%s %s" % (os.path.split(caller.filename)[-1], caller.lineno, caller.function)
     sys.stderr.write("%-26s %-5s %-40s" % (now, Level.strep[lvl], framedesc))
     for m in msg:
-        sys.stderr.write(" " + strep(m))
+        sys.stderr.write(" " + str(m))
     sys.stderr.write("\n")

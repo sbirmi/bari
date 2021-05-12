@@ -678,4 +678,5 @@ def testTrace():
     trace(Level.play, "foo", "bar")
     trace(Level.info, "foo", "bar")
     trace(Level.debug, "foo", "bar")
+    trace(Level.db, "foo", "bar")
 testTrace()
