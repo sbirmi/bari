@@ -16,6 +16,7 @@ from fwk.Trace import (
         trace,
         Level,
 )
+from Taboo.ScoreMsgSrc import ScoreMsgSrc
 from Taboo.Word import (
         Word,
         WordState,
@@ -63,6 +64,9 @@ class TurnManager:
 
         self._state = TurnMgrState.GAME_START_WAIT
 
+        self._scoreMsgSrc = ScoreMsgSrc(self._allConns, self._wordsByTurnId,
+                                        set(self._teams))
+
     @property
     def activePlayer(self):
         return self._activePlayer
@@ -74,6 +78,10 @@ class TurnManager:
     @property
     def turnDurationSec(self):
         return self._hostParameters.turnDurationSec
+
+    @property
+    def totalScore(self):
+        return self._scoreMsgSrc.score
 
     def updateState(self, newState):
         if self._state == newState:
@@ -158,6 +166,7 @@ class TurnManager:
         wordState = (WordState.COMPLETED if qmsg.jmsg[0] == "COMPLETED"
                         else WordState.DISCARDED)
         lastWord.resolve(wordState)
+        self._scoreMsgSrc.updateTotal()
 
         if not self.startNextWord():
             # game over
@@ -216,6 +225,8 @@ class TurnManager:
         self.activePlayer.incTurnsPlayed()
 
         lastWord.resolve(WordState.TIMED_OUT)
+        self._scoreMsgSrc.updateTotal()
+
         turnStarted = self.startNewTurn()
         if not turnStarted:
             # Game over

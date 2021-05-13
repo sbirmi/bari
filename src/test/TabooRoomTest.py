@@ -110,6 +110,8 @@ class TabooRoomTest(unittest.TestCase, MsgTestLib):
                                              'turnDurationSec': 30,
                                              'wordSets': ['test'],
                                              'numTurns': 1}], {ws1}),
+            ClientTxMsg(["SCORE", {1: 0, 2: 0}],
+                        {ws1}),
             InternalGiStatus([
                 {"hostParameters": {"numTeams": 2,
                                     "turnDurationSec": 30,
@@ -386,6 +388,8 @@ class TabooRoomTest(unittest.TestCase, MsgTestLib):
                 self.assertGiTxQueueMsgs(env.txq, [
                     ClientTxMsg(publicMsg, {101, 102, 201, 202}),
                     ClientTxMsg(["WAIT-FOR-KICKOFF", 2, "sb1"], {101, 102, 201, 202}, None),
+                    ClientTxMsg(["SCORE", {1: 1, 2: 0}],
+                                {101, 102, 201, 202}),
                 ], anyOrder=True)
                 self.assertEqual(env.room.teams[2].members['jg1'].turnsPlayed, 1)
 
@@ -414,7 +418,9 @@ class TabooRoomTest(unittest.TestCase, MsgTestLib):
                                  'score': [2]}]
                     self.assertGiTxQueueMsgs(env.txq, [
                         ClientTxMsg(publicMsg, {101, 102, 201, 202}),
-                        ClientTxMsg(["GAME-OVER", []], {101, 102, 201, 202}),
+                        ClientTxMsg(["SCORE", {1: 1, 2: 2}],
+                                    {101, 102, 201, 202}),
+                        ClientTxMsg(["GAME-OVER", [2]], {101, 102, 201, 202}),
                         InternalGiStatus([
                             {"hostParameters": {"numTeams": 2,
                                                 "turnDurationSec": 30,
@@ -422,7 +428,7 @@ class TabooRoomTest(unittest.TestCase, MsgTestLib):
                                                 "numTurns": 1},
                              "gameState": "GAME_OVER",
                              "clientCount": {1: {'sb1': 1, 'sb2': 1}, 2: {'jg1': 1, 'jg2': 1}},
-                             "winners": []
+                             "winners": [2]
                             }
                         ], "taboo:1"),
                     ], anyOrder=True)
@@ -501,6 +507,8 @@ class TabooRoomTest(unittest.TestCase, MsgTestLib):
                                                 "disallowed": ["c1", "c2"],
                                                 "score": [1]}],
                                 {101, 102, 201, 202}),
+                    ClientTxMsg(["SCORE", {1: 1, 2: 0}],
+                                {101, 102, 201, 202}),
                     ClientTxMsg(["TURN", 1, 2, {"team": 2, "player": "jg1", "state": "IN_PLAY"}],
                                 {101, 102, 201, 202}),
                     ClientTxMsg(["TURN", 1, 2, {"team": 2, "player": "jg1", "state": "IN_PLAY",
@@ -524,7 +532,9 @@ class TabooRoomTest(unittest.TestCase, MsgTestLib):
                                                 "disallowed": ["b1", "b2"],
                                                 "score": [1]}],
                                 {101, 102, 201, 202}),
-                    ClientTxMsg(["GAME-OVER", []],
+                    ClientTxMsg(["SCORE", {1: 3, 2: 0}],
+                                {101, 102, 201, 202}),
+                    ClientTxMsg(["GAME-OVER", [1]],
                                 {101, 102, 201, 202}),
                     InternalGiStatus([
                         {"hostParameters": {"numTeams": 2,
@@ -533,7 +543,7 @@ class TabooRoomTest(unittest.TestCase, MsgTestLib):
                                             "numTurns": 1},
                          "gameState": "GAME_OVER",
                          "clientCount": {1: {'sb1': 1, 'sb2': 1}, 2: {'jg1': 1, 'jg2': 1}},
-                         "winners": []
+                         "winners": [1]
                         }
                     ], "taboo:1"),
                 ], anyOrder=True)
@@ -613,6 +623,8 @@ class TabooRoomTest(unittest.TestCase, MsgTestLib):
                                                 "disallowed": ["c1", "c2"],
                                                 "score": [2]}],
                                 {101, 102, 201, 202}),
+                    ClientTxMsg(["SCORE", {1: 0, 2: 1}],
+                                {101, 102, 201, 202}),
                     ClientTxMsg(["TURN", 1, 2, {"team": 2, "player": "jg1", "state": "IN_PLAY"}],
                                 {101, 102, 201, 202}),
                     ClientTxMsg(["TURN", 1, 2, {"team": 2, "player": "jg1", "state": "IN_PLAY",
@@ -636,7 +648,9 @@ class TabooRoomTest(unittest.TestCase, MsgTestLib):
                                                 "disallowed": ["b1", "b2"],
                                                 "score": [2]}],
                                 {101, 102, 201, 202}),
-                    ClientTxMsg(["GAME-OVER", []],
+                    ClientTxMsg(["SCORE", {1: 0, 2: 3}],
+                                {101, 102, 201, 202}),
+                    ClientTxMsg(["GAME-OVER", [2]],
                                 {101, 102, 201, 202}),
                     InternalGiStatus([
                         {"hostParameters": {"numTeams": 2,
@@ -645,7 +659,7 @@ class TabooRoomTest(unittest.TestCase, MsgTestLib):
                                             "numTurns": 1},
                          "gameState": "GAME_OVER",
                          "clientCount": {1: {'sb1': 1, 'sb2': 1}, 2: {'jg1': 1, 'jg2': 1}},
-                         "winners": []
+                         "winners": [2]
                         }
                     ], "taboo:1"),
                 ], anyOrder=True)
@@ -805,7 +819,10 @@ class TabooTurnManagerTest(unittest.TestCase, MsgTestLib):
             stub1 = stub(turnMgr, "_findNextPlayer", mockFindNextPlayer)
             stub1.__enter__() # pylint: disable=no-member
 
-            self.assertGiTxQueueMsgs(txq, [])
+            self.assertGiTxQueueMsgs(txq, [
+                ClientTxMsg(["SCORE", {1: 0, 2: 0}],
+                            {101, 102, 201, 202}),
+            ])
 
             self.assertTrue(turnMgr.startNewTurn())
             self.assertGiTxQueueMsgs(txq, [
@@ -843,7 +860,10 @@ class TabooTurnManagerTest(unittest.TestCase, MsgTestLib):
         turnMgr = TurnManager("taboo:1", txq, wordset, teams, hostParameters, allConns, None)
 
         self.assertFalse(turnMgr.startNewTurn())
-        self.assertGiTxQueueMsgs(txq, [])
+        self.assertGiTxQueueMsgs(txq, [
+            ClientTxMsg(["SCORE", {1: 0, 2: 0}],
+                        {101, 102}),
+        ])
 
     def testRunOutOfWords(self):
         txq = asyncio.Queue()
