@@ -1,5 +1,6 @@
 """Dynamically load all word sets from Taboo/wordsets"""
 
+from collections import defaultdict
 import os
 import random
 import yaml
@@ -18,24 +19,27 @@ WORDSETS_PATH = os.path.join(os.path.split(__file__)[0], "wordsets")
 #   filename --> WordSet
 SupportedWordSets = {}
 
+def randomWord(wordPool):
+    return random.sample(wordPool, 1)[ 0 ]
+
 class WordSet:
     """
     WordList YAML file format
 
         enabled: true
         words:
-           - a:
+           a:
               - a1
               - a2
-
-    Note that the words are a list (of dictionaries) to
-    allow the same word to appear twice
     """
     def __init__(self, name, path):
         self.name = name
         self.path = path
 
         self.data = yaml.safe_load(open(self.path))
+
+        self.allWords = set(self.data.get('words', {}))
+        self._usedWordsByRequestor = defaultdict( set )
 
     def __str__(self):
         return "WordSet:{}".format(self.name)
@@ -44,7 +48,7 @@ class WordSet:
         if 'words' not in self.data:
             trace(Level.error, "'words' not found in", self.path)
             return 0
-        return len(self.data['words'])
+        return len(self.allWords)
 
     def enabled(self):
         if "enabled" not in self.data:
@@ -52,15 +56,14 @@ class WordSet:
             return False
         return self.data['enabled']
 
-    def areWordsAvailable(self, usedWordIdxs):
-        return len(usedWordIdxs) < self.count()
+    def areWordsAvailable(self, requestor):
+        return len(self._usedWordsByRequestor[requestor]) < self.count()
 
-    def nextWord(self, usedWordIdxs):
+    def nextWord(self, requestor):
         """
         Arguments
         ---------
-        usedWordIdxs : set
-            word indexes used up from self.data['words']
+        requestor : unique hashable key
 
         Returns : Map or None
         ----------------------
@@ -68,17 +71,17 @@ class WordSet:
             Map(word : str, disallowed : list[str],
                 usedWordIdxs : set(int))
         """
-        if not self.areWordsAvailable(usedWordIdxs):
+        if not self.areWordsAvailable(requestor):
             # No more words
             return None
 
-        candidateIdxs = tuple(i for i in range(self.count()) if i not in usedWordIdxs)
-        selectedIdx = random.choice(candidateIdxs)
-        selected = self.data['words'][selectedIdx]
-        word, disallowed = dict(selected).popitem()
+        candidateWords = self.allWords - self._usedWordsByRequestor[requestor]
+        word = randomWord(candidateWords)
+        disallowed = self.data['words'][word]
 
-        return Map(word=word, disallowed=disallowed,
-                   usedWordIdxs=usedWordIdxs | {selectedIdx})
+        self._usedWordsByRequestor[requestor].add(word)
+
+        return Map(word=word, disallowed=disallowed)
 
 if __name__ != "__main__": # When importing
     files = os.listdir(WORDSETS_PATH)
