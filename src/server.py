@@ -6,6 +6,7 @@ from clients to the correct game instance and vice
 versa.
 """
 
+from argparse import ArgumentParser
 import asyncio
 import itertools
 import json
@@ -142,16 +143,32 @@ async def giTxQueue(queue):
             await clientTxMsg(msg, toWs)
 
 
-def main(wsAddr="0.0.0.0", wsPort=WS_SERVER_PORT_DEFAULT):
+def main(wsAddr="0.0.0.0"):
     """Initialize websocket serving server and load plugins"""
-    print("Starting server. Listening on", wsAddr, "port", wsPort)
-    wsServer = websockets.serve(rxClient, wsAddr, wsPort) # pylint: disable=no-member
+
+    parser = ArgumentParser()
+    parser.add_argument("-p", "--port", metavar="PORT",
+                        help="Listen port (default={})".format(WS_SERVER_PORT_DEFAULT),
+                        default=WS_SERVER_PORT_DEFAULT)
+    parser.add_argument("--d7-storage", metavar="SQLITE3_FILE",
+                        help="Dirty7 sqlite3 storage file (default={})".format(
+                            Dirty7.Dirty7Lobby.DefaultStorageFile),
+                        default=Dirty7.Dirty7Lobby.DefaultStorageFile)
+
+    args = parser.parse_args()
+
+    print("Starting server. Listening on", wsAddr, "port", args.port)
+    wsServer = websockets.serve(rxClient, wsAddr, args.port) # pylint: disable=no-member
 
     asyncio.get_event_loop().create_task(giTxQueue(txQueue()))
 
-    registerGameClass(fwk.LobbyPlugin.plugin())
-    registerGameClass(Chat.ChatLobbyPlugin.plugin())
-    registerGameClass(Dirty7.Dirty7Lobby.plugin())
+    plugins = [
+            fwk.LobbyPlugin.plugin(),
+            Chat.ChatLobbyPlugin.plugin(),
+            Dirty7.Dirty7Lobby.plugin(args.d7_storage),
+    ]
+    for plugin in plugins:
+        registerGameClass(plugin)
 
     asyncio.get_event_loop().run_until_complete(wsServer)
     asyncio.get_event_loop().run_forever()
