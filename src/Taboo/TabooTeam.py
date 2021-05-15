@@ -1,6 +1,10 @@
 """ Taboo Team"""
 
-from fwk.MsgSrc import Connections
+from fwk.MsgSrc import (
+    Connections,
+    Jmai,
+    MsgSrc,
+)
 from fwk.Trace import (
     trace,
     Level,
@@ -10,12 +14,21 @@ class TabooTeam:
     """ Creates a team with a specified teamNumber
 
     """
-    def __init__(self, txQueue, teamNumber):
+    def __init__(self, txQueue, allConns, teamNumber):
         self.txQueue = txQueue
+        self.allConns = allConns
         self.teamNumber = teamNumber
+
+        self.teamStatusMsgSrc = MsgSrc(self.allConns)
 
         self.members = {}
         self.conns = Connections(self.txQueue)
+        self.updateSetMsgs()
+
+    def updateSetMsgs(self):
+        self.teamStatusMsgSrc.setMsgs([
+            Jmai(["TEAM-STATUS", self.teamNumber, list(self.members)], None),
+        ])
 
     def addPlayer(self, player):
         """ Players need to be unique. Reset not allowed
@@ -28,6 +41,7 @@ class TabooTeam:
             return
 
         self.members[player.name] = player
+        self.updateSetMsgs()
 
     def getPlayer(self, playerName):
         """ Gets the player assocaited with that name.
