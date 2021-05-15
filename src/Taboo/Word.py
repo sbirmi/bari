@@ -70,6 +70,10 @@ class Word:
     def wordId(self):
         return self._wordId
 
+    @property
+    def score(self):
+        return self._score
+
     def updateMsgs(self):
         """Figures out what messages to send to who based on internal state"""
         if self._state == WordState.IN_PLAY:

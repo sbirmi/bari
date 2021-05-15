@@ -37,6 +37,7 @@ class TabooRoom(GamePlugin):
 
         self.playerByWs = {} #<ws:player>
         self.teams = None # int -> Team
+        self._winnerTeamIds = []
 
         # Initialized after queues are set up
         self.hostParametersMsgSrc = None
@@ -68,7 +69,7 @@ class TabooRoom(GamePlugin):
         jmsg = [{"hostParameters": self.hostParameters.toJmsg()[0],
                  "gameState": self.state.name,
                  "clientCount": self._clientInfo(),
-                "winners": self._winnerInfo()}]
+                "winners": self._winnerTeamIds}]
         self.txQueue.put_nowait(InternalGiStatus(jmsg, self.path))
 
     def postQueueSetup(self):
@@ -329,8 +330,15 @@ class TabooRoom(GamePlugin):
     def _gameOver(self):
         trace(Level.game, "Game Over")
         self.state = GameState.GAME_OVER
+
+        # Update self._winnerTeamIds
+        scoreByTeamId = self.turnMgr.totalScore
+        maxScore = max(scoreByTeamId.values())
+        self._winnerTeamIds = [teamId for teamId, score in scoreByTeamId.items()
+                               if score == maxScore]
+
         self.gameOverMsgSrc.setMsgs([
-            Jmai(["GAME-OVER", self._winnerInfo()], None),
+            Jmai(["GAME-OVER", self._winnerTeamIds], None),
         ])
 
         self.publishGiStatus()
@@ -342,8 +350,3 @@ class TabooRoom(GamePlugin):
                     }
                     for (tmNr, tm) in self.teams.items()
                 }
-
-    def _winnerInfo(self):
-        if self.state == GameState.GAME_OVER:
-            return []  # TODO: add winning team IDs # pylint: disable=fixme
-        return []
