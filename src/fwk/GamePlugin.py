@@ -26,7 +26,7 @@ class Plugin:
     """
     Base game instance that is registered with the main loop by the name "path".
     """
-    def __init__(self, path, name):
+    def __init__(self, path, name, storage=None):
         """
         Arguments
         ---------
@@ -36,9 +36,12 @@ class Plugin:
                 "chat"  --  chat room's lobby
                 "chat:1"  --  chat room id 1
                 "chat:2"  --  chat room id 2
+        storage : Storage (optional)
         """
         self.path = path
         self.name = name
+        self.storage = storage
+
         self.rxQueue = None
         self.txQueue = None
         self.conns = None
