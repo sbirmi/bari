@@ -45,7 +45,7 @@ def mockPlyrTeam(txq, teamId,
                  turnsPlayedByPlayerName=None):
     turnsPlayedByPlayerName = turnsPlayedByPlayerName or {}
 
-    team = TabooTeam(txq, teamId)
+    team = TabooTeam(txq, Connections(txq), teamId)
     for plyrName, conns in connsByPlayerName.items():
         plyr = TabooPlayer(txq, name=plyrName, team=team)
         for ws in conns:
@@ -106,6 +106,8 @@ class TabooRoomTest(unittest.TestCase, MsgTestLib):
         env.room.processConnect(ws1)
 
         self.assertGiTxQueueMsgs(env.txq, [
+            ClientTxMsg(["TEAM-STATUS", 1, []], {ws1}),
+            ClientTxMsg(["TEAM-STATUS", 2, []], {ws1}),
             ClientTxMsg(['HOST-PARAMETERS', {'numTeams': 2,
                                              'turnDurationSec': 30,
                                              'wordSets': ['test'],
@@ -153,8 +155,9 @@ class TabooRoomTest(unittest.TestCase, MsgTestLib):
         #Good join - specified team number
         env.room.processMsg(ClientRxMsg(["JOIN", "sb1", 1], ws1))
         self.assertGiTxQueueMsgs(env.txq, [
+            ClientTxMsg(["TEAM-STATUS", 1, ["sb1"]], {101}),
             ClientTxMsg(["JOIN-OKAY", "sb1", 1], {ws1}, ws1),
-        ])
+        ], anyOrder=True)
 
         #Join more players
         self.setUpTeamPlayer(env, 1, "sb2", [102])
@@ -170,6 +173,8 @@ class TabooRoomTest(unittest.TestCase, MsgTestLib):
         self.drainGiTxQueue(env.txq)
         env.room.processMsg(ClientRxMsg(["JOIN", "xx", 0], ws2))
         self.assertGiTxQueueMsgs(env.txq, [
+            ClientTxMsg(["TEAM-STATUS", 1, ["sb1", "sb2", "xx"]],
+                        {101, 102, 201, 202, 203, 1001}),
             ClientTxMsg(["JOIN-OKAY", "xx", 1], {ws2}, ws2),
         ])
 
@@ -183,16 +188,20 @@ class TabooRoomTest(unittest.TestCase, MsgTestLib):
         self.drainGiTxQueue(env.txq)
         env.room.processMsg(ClientRxMsg(["JOIN", "yy", 0], ws2))
         self.assertGiTxQueueMsgs(env.txq, [
+            ClientTxMsg(["TEAM-STATUS", 1, ["sb1", "sb2", "xx", "yy"]],
+                        {101, 102, 201, 202, 203, 1001, 204, 205, 1002}),
             ClientTxMsg(["JOIN-OKAY", "yy", 1], {ws2}, ws2),
-        ])
+        ], anyOrder=True)
 
         ws2 = ws2 + 1
         env.room.processConnect(ws2)
         self.drainGiTxQueue(env.txq)
         env.room.processMsg(ClientRxMsg(["JOIN", "zz", 0], ws2))
         self.assertGiTxQueueMsgs(env.txq, [
+            ClientTxMsg(["TEAM-STATUS", 1, ["sb1", "sb2", "xx", "yy", "zz"]],
+                        {101, 102, 201, 202, 203, 1001, 204, 205, 1002, 1003}),
             ClientTxMsg(["JOIN-OKAY", "zz", 1], {ws2}, ws2),
-        ])
+        ], anyOrder=True)
 
         #A JOIN from an unrecognized ws ofc leads to assert
         with self.assertRaises(AssertionError):
@@ -694,12 +703,12 @@ class TabooWordTest(unittest.TestCase, MsgTestLib):
         for ws in playerWss | otherTeamWss | {103}: # 1 spectator added
             allConns.addConn(ws)
 
-        playerTeam = TabooTeam(self.txq, playerTeamNum)
+        playerTeam = TabooTeam(self.txq, allConns, playerTeamNum)
         player = TabooPlayer(self.txq, name=playerName, team=playerTeam)
         for ws in playerWss:
             player.addConn(ws)
 
-        otherTeam = TabooTeam(self.txq, otherTeamNum)
+        otherTeam = TabooTeam(self.txq, allConns, otherTeamNum)
         for ws in otherTeamWss:
             otherTeam.conns.addConn(ws)
 
@@ -717,6 +726,12 @@ class TabooWordTest(unittest.TestCase, MsgTestLib):
         turn = self.setUpWord()
 
         self.assertGiTxQueueMsgs(self.txq, [
+            ClientTxMsg(["TEAM-STATUS", 1, []],
+                        {101, 102, 103}),
+            ClientTxMsg(["TEAM-STATUS", 1, ['sb']],
+                        {101, 102, 103}),
+            ClientTxMsg(["TEAM-STATUS", 2, []],
+                        {101, 102, 103}),
             ClientTxMsg(["TURN", 1, 1, {"team": 1, "player": "sb", "state": "IN_PLAY"}],
                         {101, 102, 103}),
             ClientTxMsg(["TURN", 1, 1, {"team": 1, "player": "sb", "state": "IN_PLAY",

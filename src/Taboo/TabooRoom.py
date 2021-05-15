@@ -48,7 +48,7 @@ class TabooRoom(GamePlugin):
         self.hostParametersMsgSrc = HostParametersMsgSrc(self.conns, self.hostParameters)
         self.gameOverMsgSrc = MsgSrc(self.conns)
 
-        self.teams = {n: TabooTeam(self.txQueue, n)
+        self.teams = {n: TabooTeam(self.txQueue, self.conns, n)
                       for n in range(1, self.hostParameters.numTeams + 1)}
 
         wordSet = SupportedWordSets[self.hostParameters.wordSets[0]]
