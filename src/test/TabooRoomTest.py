@@ -19,6 +19,7 @@ from Taboo.Word import (
         Word,
         WordState,
 )
+import Taboo.TurnManager
 from Taboo.TurnManager import TurnManager
 from Taboo.WordSets import SupportedWordSets
 
@@ -39,6 +40,32 @@ def stub(obj, attr, tempVal):
     setattr(obj, attr, tempVal)
     yield
     setattr(obj, attr, prevVal)
+
+@contextmanager
+def stubs(objAttrTempValList):
+    """Stub a list of (obj, attr) with tempVals
+
+    Example
+
+    with stubs([(obj1, attrName1, tempVal1),
+                (obj2, attrName2, tempVal2),]):
+        # do testing
+    """
+    _stubs = [stub(*args) for args in objAttrTempValList]
+    for _stub in _stubs:
+        _stub.__enter__()
+
+    yield
+
+    for _stub in _stubs:
+        _stub.__exit__(None, None, None)
+
+def stubExpiryEpochGen():
+    def expiryEpoch(offsetSec, counter=[0]):
+        ans = counter[0] + offsetSec
+        counter[0] = counter[0] + 1
+        return ans
+    return expiryEpoch
 
 def mockPlyrTeam(txq, allConns, teamId : int,
                  connsByPlayerName,
@@ -247,7 +274,8 @@ class TabooRoomTest(unittest.TestCase, MsgTestLib):
         env = self.setUpTabooRoom()
         self.drainGiTxQueue(env.txq)
 
-        with stub(SupportedWordSets["test"], "nextWord", self.mockNextWord):
+        with stubs([(SupportedWordSets["test"], "nextWord", self.mockNextWord),
+                    (Taboo.TurnManager, "expiryEpoch", stubExpiryEpochGen())]):
             env.room.processMsg(ClientRxMsg(["KICKOFF", 2], 101))
             self.assertGiTxQueueMsgs(env.txq, [
                 ClientTxMsg(["KICKOFF-BAD", "Invalid message length"], {101}, 101),
@@ -288,8 +316,10 @@ class TabooRoomTest(unittest.TestCase, MsgTestLib):
 
                 env.room.processMsg(ClientRxMsg(["KICKOFF"], 201))
                 secretMsg = ['TURN', 1, 1, {'team': 2, 'player': 'jg1', 'state': 'IN_PLAY',
-                             'secret': 'c', 'disallowed': ['c1', 'c2']}]
-                publicMsg = ['TURN', 1, 1, {'team': 2, 'player': 'jg1', 'state': 'IN_PLAY'}]
+                                            'utcTimeout': 30,
+                                            'secret': 'c', 'disallowed': ['c1', 'c2']}]
+                publicMsg = ['TURN', 1, 1, {'team': 2, 'player': 'jg1', 'state': 'IN_PLAY',
+                                            'utcTimeout': 30}]
                 self.assertGiTxQueueMsgs(env.txq, [
                     TimerRequest(30, env.room.turnMgr.timerExpiredCb, {
                                     "turnId": 1,
@@ -403,95 +433,101 @@ class TabooRoomTest(unittest.TestCase, MsgTestLib):
             if remainingPlayers:
                 return remainingPlayers.pop(0)
             return None
-        with stub(SupportedWordSets["test"], "nextWord", self.mockNextWord):
-            with stub(env.room.turnMgr, "_findNextPlayer", mockFindNextPlayer):
-                env.room.turnMgr.startNewTurn()
-                self.assertGiTxQueueMsgs(env.txq, [
-                    ClientTxMsg(["WAIT-FOR-KICKOFF", 1, "jg1"], {101, 102, 201, 202}, None),
-                ], anyOrder=True)
+        with stubs([(SupportedWordSets["test"], "nextWord", self.mockNextWord),
+                    (Taboo.TurnManager, "expiryEpoch", stubExpiryEpochGen()),
+                    (env.room.turnMgr, "_findNextPlayer", mockFindNextPlayer)]):
+            env.room.turnMgr.startNewTurn()
+            self.assertGiTxQueueMsgs(env.txq, [
+                ClientTxMsg(["WAIT-FOR-KICKOFF", 1, "jg1"], {101, 102, 201, 202}, None),
+            ], anyOrder=True)
 
-                # Start the timer by issuing a KICKOFF
-                env.room.processMsg(ClientRxMsg(["KICKOFF"], 201))
-                secretMsg = ['TURN', 1, 1, {'team': 2, 'player': 'jg1', 'state': 'IN_PLAY',
-                             'secret': 'c', 'disallowed': ['c1', 'c2']}]
-                publicMsg = ['TURN', 1, 1, {'team': 2, 'player': 'jg1', 'state': 'IN_PLAY'}]
+            # Start the timer by issuing a KICKOFF
+            env.room.processMsg(ClientRxMsg(["KICKOFF"], 201))
+            secretMsg = ['TURN', 1, 1, {'team': 2, 'player': 'jg1', 'state': 'IN_PLAY',
+                                        'utcTimeout': 30,
+                                        'secret': 'c', 'disallowed': ['c1', 'c2']}]
+            publicMsg = ['TURN', 1, 1, {'team': 2, 'player': 'jg1', 'state': 'IN_PLAY',
+                                        'utcTimeout': 30}]
+            self.assertGiTxQueueMsgs(env.txq, [
+                TimerRequest(30, env.room.turnMgr.timerExpiredCb, {
+                                "turnId": 1,
+                             }),
+                ClientTxMsg(secretMsg, {201}),
+                ClientTxMsg(secretMsg, {101, 102}),
+                ClientTxMsg(publicMsg, {101, 102, 201, 202}),
+            ], anyOrder=True)
+            self.assertEqual(env.room.teams[2].members['jg1'].turnsPlayed, 0)
+
+            # Invalid turnId
+            env.room.turnMgr.timerExpiredCb({"turnId": 5})
+
+            # Valid timer expiry, starts the next turn
+            env.room.turnMgr.timerExpiredCb({"turnId": 1})
+            publicMsg = ['TURN', 1, 1, {'team': 2, 'player': 'jg1', 'state': 'TIMED_OUT',
+                         'secret': 'c', 'disallowed': ['c1', 'c2'],
+                         'score': [1]}]
+            self.assertGiTxQueueMsgs(env.txq, [
+                ClientTxMsg(publicMsg, {101, 102, 201, 202}),
+                ClientTxMsg(["WAIT-FOR-KICKOFF", 2, "sb1"], {101, 102, 201, 202}, None),
+                ClientTxMsg(["SCORE", {1: 1, 2: 0}],
+                            {101, 102, 201, 202}),
+            ], anyOrder=True)
+            self.assertEqual(env.room.teams[2].members['jg1'].turnsPlayed, 1)
+
+            # KICKOFF new turn, discard 1st word, let timer expire on the last word
+            env.room.processMsg(ClientRxMsg(["KICKOFF"], 101))
+            secretMsg = ['TURN', 2, 1, {'team': 1, 'player': 'sb1', 'state': 'IN_PLAY',
+                                        'utcTimeout': 31,
+                                        'secret': 'a', 'disallowed': ['a1', 'a2']}]
+            publicMsg = ['TURN', 2, 1, {'team': 1, 'player': 'sb1', 'state': 'IN_PLAY',
+                                        'utcTimeout': 31}]
+            self.assertGiTxQueueMsgs(env.txq, [
+                TimerRequest(30, env.room.turnMgr.timerExpiredCb, {
+                                "turnId": 2,
+                             }),
+                ClientTxMsg(secretMsg, {101}),
+                ClientTxMsg(secretMsg, {201, 202}),
+                ClientTxMsg(publicMsg, {101, 102, 201, 202}),
+            ], anyOrder=True)
+
+            env.room.processMsg(ClientRxMsg(["DISCARD", 2, 1], 101))
+            self.drainGiTxQueue(env.txq)
+
+            with stub(env.room.turnMgr._wordSet, "areWordsAvailable",
+                      lambda path: False):
+                env.room.turnMgr.timerExpiredCb({"turnId": 2})
+                publicMsg = ['TURN', 2, 2, {'team': 1, 'player': 'sb1', 'state': 'TIMED_OUT',
+                             'secret': 'b', 'disallowed': ['b1', 'b2'],
+                             'score': [2]}]
                 self.assertGiTxQueueMsgs(env.txq, [
-                    TimerRequest(30, env.room.turnMgr.timerExpiredCb, {
-                                    "turnId": 1,
-                                 }),
-                    ClientTxMsg(secretMsg, {201}),
-                    ClientTxMsg(secretMsg, {101, 102}),
                     ClientTxMsg(publicMsg, {101, 102, 201, 202}),
-                ], anyOrder=True)
-                self.assertEqual(env.room.teams[2].members['jg1'].turnsPlayed, 0)
-
-                # Invalid turnId
-                env.room.turnMgr.timerExpiredCb({"turnId": 5})
-
-                # Valid timer expiry, starts the next turn
-                env.room.turnMgr.timerExpiredCb({"turnId": 1})
-                publicMsg = ['TURN', 1, 1, {'team': 2, 'player': 'jg1', 'state': 'TIMED_OUT',
-                             'secret': 'c', 'disallowed': ['c1', 'c2'],
-                             'score': [1]}]
-                self.assertGiTxQueueMsgs(env.txq, [
-                    ClientTxMsg(publicMsg, {101, 102, 201, 202}),
-                    ClientTxMsg(["WAIT-FOR-KICKOFF", 2, "sb1"], {101, 102, 201, 202}, None),
-                    ClientTxMsg(["SCORE", {1: 1, 2: 0}],
+                    ClientTxMsg(["SCORE", {1: 1, 2: 2}],
                                 {101, 102, 201, 202}),
+                    ClientTxMsg(["GAME-OVER", [2]], {101, 102, 201, 202}),
+                    InternalGiStatus([
+                        {"hostParameters": {"numTeams": 2,
+                                            "turnDurationSec": 30,
+                                            "wordSets": ["test"],
+                                            "numTurns": 1},
+                         "gameState": "GAME_OVER",
+                         "clientCount": {1: {'sb1': 1, 'sb2': 1}, 2: {'jg1': 1, 'jg2': 1}},
+                         "winners": [2]
+                        }
+                    ], "taboo:1"),
                 ], anyOrder=True)
-                self.assertEqual(env.room.teams[2].members['jg1'].turnsPlayed, 1)
+                self.assertEqual(env.room.teams[1].members['sb1'].turnsPlayed, 1)
 
-                # KICKOFF new turn, discard 1st word, let timer expire on the last word
-                env.room.processMsg(ClientRxMsg(["KICKOFF"], 101))
-                secretMsg = ['TURN', 2, 1, {'team': 1, 'player': 'sb1', 'state': 'IN_PLAY',
-                             'secret': 'a', 'disallowed': ['a1', 'a2']}]
-                publicMsg = ['TURN', 2, 1, {'team': 1, 'player': 'sb1', 'state': 'IN_PLAY'}]
-                self.assertGiTxQueueMsgs(env.txq, [
-                    TimerRequest(30, env.room.turnMgr.timerExpiredCb, {
-                                    "turnId": 2,
-                                 }),
-                    ClientTxMsg(secretMsg, {101}),
-                    ClientTxMsg(secretMsg, {201, 202}),
-                    ClientTxMsg(publicMsg, {101, 102, 201, 202}),
-                ], anyOrder=True)
-
-                env.room.processMsg(ClientRxMsg(["DISCARD", 2, 1], 101))
-                self.drainGiTxQueue(env.txq)
-
-                with stub(env.room.turnMgr._wordSet, "areWordsAvailable",
-                          lambda path: False):
-                    env.room.turnMgr.timerExpiredCb({"turnId": 2})
-                    publicMsg = ['TURN', 2, 2, {'team': 1, 'player': 'sb1', 'state': 'TIMED_OUT',
-                                 'secret': 'b', 'disallowed': ['b1', 'b2'],
-                                 'score': [2]}]
-                    self.assertGiTxQueueMsgs(env.txq, [
-                        ClientTxMsg(publicMsg, {101, 102, 201, 202}),
-                        ClientTxMsg(["SCORE", {1: 1, 2: 2}],
-                                    {101, 102, 201, 202}),
-                        ClientTxMsg(["GAME-OVER", [2]], {101, 102, 201, 202}),
-                        InternalGiStatus([
-                            {"hostParameters": {"numTeams": 2,
-                                                "turnDurationSec": 30,
-                                                "wordSets": ["test"],
-                                                "numTurns": 1},
-                             "gameState": "GAME_OVER",
-                             "clientCount": {1: {'sb1': 1, 'sb2': 1}, 2: {'jg1': 1, 'jg2': 1}},
-                             "winners": [2]
-                            }
-                        ], "taboo:1"),
-                    ], anyOrder=True)
-                    self.assertEqual(env.room.teams[1].members['sb1'].turnsPlayed, 1)
-
-                    # Test timer fire after the game is over
-                    env.room.turnMgr.timerExpiredCb({"turnId": 2})
-                    self.assertGiTxQueueMsgs(env.txq, [])
-                    self.assertEqual(env.room.teams[1].members['sb1'].turnsPlayed, 1)
+                # Test timer fire after the game is over
+                env.room.turnMgr.timerExpiredCb({"turnId": 2})
+                self.assertGiTxQueueMsgs(env.txq, [])
+                self.assertEqual(env.room.teams[1].members['sb1'].turnsPlayed, 1)
 
     def testDiscard(self):
         env = self.setUpTabooRoom()
         self.drainGiTxQueue(env.txq)
 
-        with stub(SupportedWordSets["test"], "nextWord", self.mockNextWord):
+        with stubs([(SupportedWordSets["test"], "nextWord", self.mockNextWord),
+                    (Taboo.TurnManager, "expiryEpoch", stubExpiryEpochGen())]):
             env.room.processMsg(ClientRxMsg(["DISCARD"], 101))
             self.assertGiTxQueueMsgs(env.txq, [
                 ClientTxMsg(["DISCARD-BAD", "Invalid message length"], {101}, 101),
@@ -557,13 +593,16 @@ class TabooRoomTest(unittest.TestCase, MsgTestLib):
                                 {101, 102, 201, 202}),
                     ClientTxMsg(["SCORE", {1: 1, 2: 0}],
                                 {101, 102, 201, 202}),
-                    ClientTxMsg(["TURN", 1, 2, {"team": 2, "player": "jg1", "state": "IN_PLAY"}],
+                    ClientTxMsg(["TURN", 1, 2, {"team": 2, "player": "jg1", "state": "IN_PLAY",
+                                                "utcTimeout": 30}],
                                 {101, 102, 201, 202}),
                     ClientTxMsg(["TURN", 1, 2, {"team": 2, "player": "jg1", "state": "IN_PLAY",
+                                                "utcTimeout": 30,
                                                 "secret": "a",
                                                 "disallowed": ["a1", "a2"]}],
                                 {201}),
                     ClientTxMsg(["TURN", 1, 2, {"team": 2, "player": "jg1", "state": "IN_PLAY",
+                                                "utcTimeout": 30,
                                                 "secret": "a",
                                                 "disallowed": ["a1", "a2"]}],
                                 {101, 102}),
@@ -607,7 +646,8 @@ class TabooRoomTest(unittest.TestCase, MsgTestLib):
         env = self.setUpTabooRoom()
         self.drainGiTxQueue(env.txq)
 
-        with stub(SupportedWordSets["test"], "nextWord", self.mockNextWord):
+        with stubs([(SupportedWordSets["test"], "nextWord", self.mockNextWord),
+                    (Taboo.TurnManager, "expiryEpoch", stubExpiryEpochGen())]):
             env.room.processMsg(ClientRxMsg(["COMPLETED"], 101))
             self.assertGiTxQueueMsgs(env.txq, [
                 ClientTxMsg(["COMPLETED-BAD", "Invalid message length"], {101}, 101),
@@ -673,13 +713,16 @@ class TabooRoomTest(unittest.TestCase, MsgTestLib):
                                 {101, 102, 201, 202}),
                     ClientTxMsg(["SCORE", {1: 0, 2: 1}],
                                 {101, 102, 201, 202}),
-                    ClientTxMsg(["TURN", 1, 2, {"team": 2, "player": "jg1", "state": "IN_PLAY"}],
+                    ClientTxMsg(["TURN", 1, 2, {"team": 2, "player": "jg1", "state": "IN_PLAY",
+                                                "utcTimeout": 30}],
                                 {101, 102, 201, 202}),
                     ClientTxMsg(["TURN", 1, 2, {"team": 2, "player": "jg1", "state": "IN_PLAY",
+                                                "utcTimeout": 30,
                                                 "secret": "a",
                                                 "disallowed": ["a1", "a2"]}],
                                 {201}),
                     ClientTxMsg(["TURN", 1, 2, {"team": 2, "player": "jg1", "state": "IN_PLAY",
+                                                "utcTimeout": 30,
                                                 "secret": "a",
                                                 "disallowed": ["a1", "a2"]}],
                                 {101, 102}),
@@ -728,6 +771,7 @@ class TabooWordTest(unittest.TestCase, MsgTestLib):
                   player=None, otherTeams=None,
                   allConns=None,
                   state=WordState.IN_PLAY,
+                  utcTimeout=30,
                   score=None,
                   playerName="sb", playerTeamNum=1, playerWss=None,
                   otherTeamNum=2, otherTeamWss=None):
@@ -758,6 +802,7 @@ class TabooWordTest(unittest.TestCase, MsgTestLib):
                     secret=secret, disallowed=disallowed,
                     player=player, otherTeams=otherTeams,
                     allConns=allConns,
+                    utcTimeout=utcTimeout,
                     state=state,
                     score=score)
 
@@ -771,13 +816,16 @@ class TabooWordTest(unittest.TestCase, MsgTestLib):
                         {101, 102, 103}),
             ClientTxMsg(["TEAM-STATUS", 2, []],
                         {101, 102, 103}),
-            ClientTxMsg(["TURN", 1, 1, {"team": 1, "player": "sb", "state": "IN_PLAY"}],
+            ClientTxMsg(["TURN", 1, 1, {"team": 1, "player": "sb", "state": "IN_PLAY",
+                                        "utcTimeout": 30}],
                         {101, 102, 103}),
             ClientTxMsg(["TURN", 1, 1, {"team": 1, "player": "sb", "state": "IN_PLAY",
+                                        "utcTimeout": 30,
                                         "secret": "a",
                                         "disallowed": ["a1", "a2"]}],
                         {101}),
             ClientTxMsg(["TURN", 1, 1, {"team": 1, "player": "sb", "state": "IN_PLAY",
+                                        "utcTimeout": 30,
                                         "secret": "a",
                                         "disallowed": ["a1", "a2"]}],
                         {102}),
@@ -890,8 +938,10 @@ class TabooTurnManagerTest(unittest.TestCase, MsgTestLib):
 
             self.assertTrue(turnMgr.startNextWord())
             secretMsg = ['TURN', 1, 1, {'team': 2, 'player': 'jg1', 'state': 'IN_PLAY',
+                                        'utcTimeout': None,  # We didn't send KICKOFF explicitly
                                         'secret': 'c', 'disallowed': ['c1', 'c2']}]
-            publicMsg = ['TURN', 1, 1, {'team': 2, 'player': 'jg1', 'state': 'IN_PLAY'}]
+            publicMsg = ['TURN', 1, 1, {'team': 2, 'player': 'jg1', 'state': 'IN_PLAY',
+                                        'utcTimeout': None}]
             self.assertGiTxQueueMsgs(txq, [
                 ClientTxMsg(publicMsg, {101, 102, 201, 202}),
                 ClientTxMsg(secretMsg, {101, 102}),
@@ -967,8 +1017,10 @@ class TabooTurnManagerTest(unittest.TestCase, MsgTestLib):
 
             self.assertTrue(turnMgr.startNextWord())
             secretMsg = ['TURN', 1, 1, {'team': 2, 'player': 'jg1', 'state': 'IN_PLAY',
+                                        'utcTimeout': None, # didn't send KICKOFF explicitly
                                         'secret': 'c', 'disallowed': ['c1', 'c2']}]
-            publicMsg = ['TURN', 1, 1, {'team': 2, 'player': 'jg1', 'state': 'IN_PLAY'}]
+            publicMsg = ['TURN', 1, 1, {'team': 2, 'player': 'jg1', 'state': 'IN_PLAY',
+                                        'utcTimeout': None}]
             self.assertGiTxQueueMsgs(txq, [
                 ClientTxMsg(publicMsg, {101, 102, 201, 202}),
                 ClientTxMsg(secretMsg, {101, 102}),
@@ -983,8 +1035,10 @@ class TabooTurnManagerTest(unittest.TestCase, MsgTestLib):
 
             self.assertTrue(turnMgr.startNextWord())
             secretMsg = ['TURN', 2, 1, {'team': 1, 'player': 'sb1', 'state': 'IN_PLAY',
+                                        'utcTimeout': None, # didn't send KICKOFF explicitly
                                         'secret': 'a', 'disallowed': ['a1', 'a2']}]
-            publicMsg = ['TURN', 2, 1, {'team': 1, 'player': 'sb1', 'state': 'IN_PLAY'}]
+            publicMsg = ['TURN', 2, 1, {'team': 1, 'player': 'sb1', 'state': 'IN_PLAY',
+                                        'utcTimeout': None}]
             self.assertGiTxQueueMsgs(txq, [
                 ClientTxMsg(publicMsg, {101, 102, 201, 202}),
                 ClientTxMsg(secretMsg, {201, 202}),
@@ -999,8 +1053,10 @@ class TabooTurnManagerTest(unittest.TestCase, MsgTestLib):
 
             self.assertTrue(turnMgr.startNextWord())
             secretMsg = ['TURN', 3, 1, {'team': 2, 'player': 'jg2', 'state': 'IN_PLAY',
+                                        'utcTimeout': None, # didn't send KICKOFF explicitly
                                         'secret': 'b', 'disallowed': ['b1', 'b2']}]
-            publicMsg = ['TURN', 3, 1, {'team': 2, 'player': 'jg2', 'state': 'IN_PLAY'}]
+            publicMsg = ['TURN', 3, 1, {'team': 2, 'player': 'jg2', 'state': 'IN_PLAY',
+                                        'utcTimeout': None}]
             self.assertGiTxQueueMsgs(txq, [
                 ClientTxMsg(publicMsg, {101, 102, 201, 202}),
                 ClientTxMsg(secretMsg, {101, 102}),

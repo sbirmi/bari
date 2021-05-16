@@ -22,6 +22,7 @@ class Word:
     def __init__(self, turnId, wordId,
                  secret, disallowed,
                  player, otherTeams, allConns,
+                 utcTimeout,
                  state=WordState.IN_PLAY,
                  score=None):
         self._turnId = turnId
@@ -30,6 +31,7 @@ class Word:
         self._disallowed = disallowed
         self._player = player
         self._otherTeams = otherTeams
+        self._utcTimeout = utcTimeout
         self._state = state
         self._score = score or [] # list of teamNumbers that should be awarded points
 
@@ -82,7 +84,8 @@ class Word:
             msg1 = ["TURN", self._turnId, self._wordId,
                     {"team": self._player.team.teamNumber,
                      "player": self._player.name,
-                     "state": self._state.name}]
+                     "state": self._state.name,
+                     "utcTimeout": self._utcTimeout}]
             self._publicMsgSrc.setMsgs([Jmai(msg1, None)])
 
             msg2 = msg1[:] # make a copy of msg1
