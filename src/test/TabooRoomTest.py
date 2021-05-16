@@ -40,14 +40,14 @@ def stub(obj, attr, tempVal):
     yield
     setattr(obj, attr, prevVal)
 
-def mockPlyrTeam(txq, teamId,
+def mockPlyrTeam(txq, allConns, teamId : int,
                  connsByPlayerName,
                  turnsPlayedByPlayerName=None):
     turnsPlayedByPlayerName = turnsPlayedByPlayerName or {}
 
     team = TabooTeam(txq, Connections(txq), teamId)
     for plyrName, conns in connsByPlayerName.items():
-        plyr = TabooPlayer(txq, name=plyrName, team=team)
+        plyr = TabooPlayer(txq, allConns, name=plyrName, team=team)
         for ws in conns:
             plyr.addConn(ws)
         plyr.turnsPlayed = turnsPlayedByPlayerName.get(plyrName, 0)
@@ -155,6 +155,10 @@ class TabooRoomTest(unittest.TestCase, MsgTestLib):
         #Good join - specified team number
         env.room.processMsg(ClientRxMsg(["JOIN", "sb1", 1], ws1))
         self.assertGiTxQueueMsgs(env.txq, [
+            ClientTxMsg(['PLAYER-STATUS', 'sb1', {'numConns': 0, 'ready': False, 'turnsPlayed': 0}],
+                        {101}),
+            ClientTxMsg(['PLAYER-STATUS', 'sb1', {'numConns': 1, 'ready': False, 'turnsPlayed': 0}],
+                        {101}),
             ClientTxMsg(["TEAM-STATUS", 1, ["sb1"]], {101}),
             ClientTxMsg(["JOIN-OKAY", "sb1", 1], {ws1}, ws1),
         ], anyOrder=True)
@@ -175,8 +179,12 @@ class TabooRoomTest(unittest.TestCase, MsgTestLib):
         self.assertGiTxQueueMsgs(env.txq, [
             ClientTxMsg(["TEAM-STATUS", 1, ["sb1", "sb2", "xx"]],
                         {101, 102, 201, 202, 203, 1001}),
+            ClientTxMsg(['PLAYER-STATUS', 'xx', {'numConns': 0, 'ready': False, 'turnsPlayed': 0}],
+                        {101, 102, 201, 202, 203, 1001}),
+            ClientTxMsg(['PLAYER-STATUS', 'xx', {'numConns': 1, 'ready': False, 'turnsPlayed': 0}],
+                        {101, 102, 201, 202, 203, 1001}),
             ClientTxMsg(["JOIN-OKAY", "xx", 1], {ws2}, ws2),
-        ])
+        ], anyOrder=True)
 
         #Now run a bunch of new JOINs on team 2
         self.setUpTeamPlayer(env, 2, "jg4", [204])
@@ -190,6 +198,10 @@ class TabooRoomTest(unittest.TestCase, MsgTestLib):
         self.assertGiTxQueueMsgs(env.txq, [
             ClientTxMsg(["TEAM-STATUS", 1, ["sb1", "sb2", "xx", "yy"]],
                         {101, 102, 201, 202, 203, 1001, 204, 205, 1002}),
+            ClientTxMsg(['PLAYER-STATUS', 'yy', {'numConns': 0, 'ready': False, 'turnsPlayed': 0}],
+                        {101, 102, 201, 202, 203, 1001, 204, 205, 1002}),
+            ClientTxMsg(['PLAYER-STATUS', 'yy', {'numConns': 1, 'ready': False, 'turnsPlayed': 0}],
+                        {101, 102, 201, 202, 203, 1001, 204, 205, 1002}),
             ClientTxMsg(["JOIN-OKAY", "yy", 1], {ws2}, ws2),
         ], anyOrder=True)
 
@@ -199,6 +211,10 @@ class TabooRoomTest(unittest.TestCase, MsgTestLib):
         env.room.processMsg(ClientRxMsg(["JOIN", "zz", 0], ws2))
         self.assertGiTxQueueMsgs(env.txq, [
             ClientTxMsg(["TEAM-STATUS", 1, ["sb1", "sb2", "xx", "yy", "zz"]],
+                        {101, 102, 201, 202, 203, 1001, 204, 205, 1002, 1003}),
+            ClientTxMsg(['PLAYER-STATUS', 'zz', {'numConns': 0, 'ready': False, 'turnsPlayed': 0}],
+                        {101, 102, 201, 202, 203, 1001, 204, 205, 1002, 1003}),
+            ClientTxMsg(['PLAYER-STATUS', 'zz', {'numConns': 1, 'ready': False, 'turnsPlayed': 0}],
                         {101, 102, 201, 202, 203, 1001, 204, 205, 1002, 1003}),
             ClientTxMsg(["JOIN-OKAY", "zz", 1], {ws2}, ws2),
         ], anyOrder=True)
@@ -212,6 +228,8 @@ class TabooRoomTest(unittest.TestCase, MsgTestLib):
         self.drainGiTxQueue(env.txq)
         env.room.processMsg(ClientRxMsg(["JOIN", "jg1", 1], 2001))
         self.assertGiTxQueueMsgs(env.txq, [
+            ClientTxMsg(['PLAYER-STATUS', 'jg1', {'numConns': 2, 'ready': False, 'turnsPlayed': 0}],
+                        {101, 102, 201, 202, 203, 1001, 204, 205, 1002, 1003, 2001}),
             ClientTxMsg(["JOIN-OKAY", "jg1", 2], {2001}, 2001),
         ])
 
@@ -220,6 +238,8 @@ class TabooRoomTest(unittest.TestCase, MsgTestLib):
         self.drainGiTxQueue(env.txq)
         env.room.processMsg(ClientRxMsg(["JOIN", "jg1", 0], 2002))
         self.assertGiTxQueueMsgs(env.txq, [
+            ClientTxMsg(['PLAYER-STATUS', 'jg1', {'numConns': 3, 'ready': False, 'turnsPlayed': 0}],
+                        {101, 102, 201, 202, 203, 1001, 204, 205, 1002, 1003, 2001, 2002}),
             ClientTxMsg(["JOIN-OKAY", "jg1", 2], {2002}, 2002),
         ])
 
@@ -316,13 +336,28 @@ class TabooRoomTest(unittest.TestCase, MsgTestLib):
             return None
         with stub(env.room.turnMgr, "_findNextPlayer", mockFindNextPlayer):
             env.room.processMsg(ClientRxMsg(["READY"], 101))
-            self.assertGiTxQueueMsgs(env.txq, [])
+            self.assertGiTxQueueMsgs(env.txq, [
+                ClientTxMsg(['PLAYER-STATUS', 'sb1', {'numConns': 1,
+                                                      'ready': True,
+                                                      'turnsPlayed': 0}],
+                            {101, 102, 201, 202}),
+            ])
             self.assertEqual(env.room.state, TabooRoom.GameState.WAITING_TO_START)
             env.room.processMsg(ClientRxMsg(["READY"], 102))
-            self.assertGiTxQueueMsgs(env.txq, [])
+            self.assertGiTxQueueMsgs(env.txq, [
+                ClientTxMsg(['PLAYER-STATUS', 'sb2', {'numConns': 1,
+                                                      'ready': True,
+                                                      'turnsPlayed': 0}],
+                            {101, 102, 201, 202}),
+            ])
             self.assertEqual(env.room.state, TabooRoom.GameState.WAITING_TO_START)
             env.room.processMsg(ClientRxMsg(["READY"], 201))
-            self.assertGiTxQueueMsgs(env.txq, [])
+            self.assertGiTxQueueMsgs(env.txq, [
+                ClientTxMsg(['PLAYER-STATUS', 'jg1', {'numConns': 1,
+                                                      'ready': True,
+                                                      'turnsPlayed': 0}],
+                            {101, 102, 201, 202}),
+            ])
             self.assertEqual(env.room.state, TabooRoom.GameState.WAITING_TO_START)
 
             #If a player sends READY multiple times, it is replied with a READY-BAD
@@ -334,6 +369,10 @@ class TabooRoomTest(unittest.TestCase, MsgTestLib):
             #READY from last of the (initial) players trigger start of the game
             env.room.processMsg(ClientRxMsg(["READY"], 202))
             self.assertGiTxQueueMsgs(env.txq, [
+                ClientTxMsg(['PLAYER-STATUS', 'jg2', {'numConns': 1,
+                                                      'ready': True,
+                                                      'turnsPlayed': 0}],
+                            {101, 102, 201, 202}),
                 ClientTxMsg(["WAIT-FOR-KICKOFF", 1, "jg1"], {101, 102, 201, 202}, None),
             ])
             self.assertEqual(env.room.state, TabooRoom.GameState.RUNNING)
@@ -704,7 +743,7 @@ class TabooWordTest(unittest.TestCase, MsgTestLib):
             allConns.addConn(ws)
 
         playerTeam = TabooTeam(self.txq, allConns, playerTeamNum)
-        player = TabooPlayer(self.txq, name=playerName, team=playerTeam)
+        player = TabooPlayer(self.txq, allConns, name=playerName, team=playerTeam)
         for ws in playerWss:
             player.addConn(ws)
 
@@ -742,6 +781,10 @@ class TabooWordTest(unittest.TestCase, MsgTestLib):
                                         "secret": "a",
                                         "disallowed": ["a1", "a2"]}],
                         {102}),
+            ClientTxMsg(["PLAYER-STATUS", "sb", {"numConns": 1,
+                                                 "ready": False,
+                                                 "turnsPlayed": 0}],
+                        {101, 102, 103}),
         ], anyOrder=True)
         self.assertIsNotNone(turn._privateMsgSrc)
 
@@ -814,8 +857,9 @@ class TabooTurnManagerTest(unittest.TestCase, MsgTestLib):
         txq = asyncio.Queue()
         wordset = SupportedWordSets["test"]
         with stub(wordset, "nextWord", self.mockNextWord):
-            team1 = mockPlyrTeam(txq, 1, {"sb1": [101], "sb2": [102]}, {})
-            team2 = mockPlyrTeam(txq, 2, {"jg1": [201], "jg2": [202]}, {})
+            allConns = Connections(txq)
+            team1 = mockPlyrTeam(txq, allConns, 1, {"sb1": [101], "sb2": [102]}, {})
+            team2 = mockPlyrTeam(txq, allConns, 2, {"jg1": [201], "jg2": [202]}, {})
 
             teams = {1: team1, 2: team2}
             hostParameters = HostParameters(numTeams=2,
@@ -823,10 +867,10 @@ class TabooTurnManagerTest(unittest.TestCase, MsgTestLib):
                                             wordSets=["test"],
                                             numTurns=2)
 
-            allConns = Connections(txq)
             for team in teams.values():
                 for ws in team.conns._wss:
                     allConns.addConn(ws)
+            self.drainGiTxQueue(txq)
 
             turnMgr = TurnManager("taboo:1", txq, wordset, teams, hostParameters, allConns, None)
             def mockFindNextPlayer():
@@ -837,7 +881,7 @@ class TabooTurnManagerTest(unittest.TestCase, MsgTestLib):
             self.assertGiTxQueueMsgs(txq, [
                 ClientTxMsg(["SCORE", {1: 0, 2: 0}],
                             {101, 102, 201, 202}),
-            ])
+            ], anyOrder=True)
 
             self.assertTrue(turnMgr.startNewTurn())
             self.assertGiTxQueueMsgs(txq, [
@@ -858,8 +902,9 @@ class TabooTurnManagerTest(unittest.TestCase, MsgTestLib):
         txq = asyncio.Queue()
         wordset = SupportedWordSets["test"]
 
-        team1 = mockPlyrTeam(txq, 1, {"sb": [101]}, {"sb": 2})
-        team2 = mockPlyrTeam(txq, 2, {"jg": [102]}, {"jg": 2})
+        allConns = Connections(txq)
+        team1 = mockPlyrTeam(txq, allConns, 1, {"sb": [101]}, {"sb": 2})
+        team2 = mockPlyrTeam(txq, allConns, 2, {"jg": [102]}, {"jg": 2})
 
         teams = {1: team1, 2: team2}
         hostParameters = HostParameters(numTeams=2,
@@ -867,7 +912,6 @@ class TabooTurnManagerTest(unittest.TestCase, MsgTestLib):
                                         wordSets=["test"],
                                         numTurns=2)
 
-        allConns = Connections(txq)
         for team in teams.values():
             for ws in team.conns._wss:
                 allConns.addConn(ws)
@@ -876,16 +920,25 @@ class TabooTurnManagerTest(unittest.TestCase, MsgTestLib):
 
         self.assertFalse(turnMgr.startNewTurn())
         self.assertGiTxQueueMsgs(txq, [
+            ClientTxMsg(['PLAYER-STATUS', 'jg', {'numConns': 1, 'ready': False, 'turnsPlayed': 0}],
+                        {101}),
+            ClientTxMsg(['PLAYER-STATUS', 'sb', {'numConns': 1, 'ready': False, 'turnsPlayed': 0}],
+                        {101}),
+            ClientTxMsg(['PLAYER-STATUS', 'jg', {'numConns': 1, 'ready': False, 'turnsPlayed': 0}],
+                        {102}),
+            ClientTxMsg(['PLAYER-STATUS', 'sb', {'numConns': 1, 'ready': False, 'turnsPlayed': 0}],
+                        {102}),
             ClientTxMsg(["SCORE", {1: 0, 2: 0}],
                         {101, 102}),
-        ])
+        ], anyOrder=True)
 
     def testRunOutOfWords(self):
         txq = asyncio.Queue()
         wordset = SupportedWordSets["test"]
         with stub(wordset, "nextWord", self.mockNextWord):
-            team1 = mockPlyrTeam(txq, 1, {"sb1": [101], "sb2": [102]})
-            team2 = mockPlyrTeam(txq, 2, {"jg1": [201], "jg2": [202]})
+            allConns = Connections(txq)
+            team1 = mockPlyrTeam(txq, allConns, 1, {"sb1": [101], "sb2": [102]})
+            team2 = mockPlyrTeam(txq, allConns, 2, {"jg1": [201], "jg2": [202]})
 
             teams = {1: team1, 2: team2}
             hostParameters = HostParameters(numTeams=2,
@@ -893,7 +946,6 @@ class TabooTurnManagerTest(unittest.TestCase, MsgTestLib):
                                             wordSets=["test"],
                                             numTurns=2)
 
-            allConns = Connections(txq)
             for team in teams.values():
                 for ws in team.conns._wss:
                     allConns.addConn(ws)
@@ -961,9 +1013,10 @@ class TabooTurnManagerTest(unittest.TestCase, MsgTestLib):
     def testNoClients(self):
         txq = asyncio.Queue()
         wordset = SupportedWordSets["test"]
+        allConns = Connections(txq)
 
-        team1 = mockPlyrTeam(txq, 1, {"sb": []})
-        team2 = mockPlyrTeam(txq, 2, {"jg": []})
+        team1 = mockPlyrTeam(txq, allConns, 1, {"sb": []})
+        team2 = mockPlyrTeam(txq, allConns, 2, {"jg": []})
 
         teams = {1: team1, 2: team2}
         hostParameters = HostParameters(numTeams=2,
@@ -971,7 +1024,6 @@ class TabooTurnManagerTest(unittest.TestCase, MsgTestLib):
                                         wordSets=["test"],
                                         numTurns=1)
 
-        allConns = Connections(txq)
         for team in teams.values():
             for ws in team.conns._wss:
                 allConns.addConn(ws)
