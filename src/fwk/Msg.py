@@ -1,7 +1,5 @@
 """Basic message definitions passed within bari."""
 
-from fwk.Trace import strep
-
 # pylint: disable=too-few-public-methods
 # pylint: disable=missing-class-docstring
 
@@ -25,7 +23,7 @@ class MsgBase:
         """Each message must have a unique representation of the content.
         This function is used to implement Msg comparison"""
         # pylint: disable=bad-super-call
-        return self.__class__.__name__ + ": initiatorWs=" + strep(self.initiatorWs)
+        return self.__class__.__name__ + ": initiatorWs=" + str(self.initiatorWs)
 
 class ClientRxMsg(MsgBase):
     def __init__(self, jmsg, initiatorWs):
@@ -46,7 +44,7 @@ class ClientTxMsg(MsgBase):
     def __str__(self):
         # pylint: disable=bad-super-call
         return (super(self.__class__, self).__str__() +
-                " toWss=" + ",".join(map(strep, self.toWss)) +
+                " toWss=" + ",".join(str(w) for w in self.toWss) +
                 " jmsg=" + str(self.jmsg))
 
 class InternalRegisterGi(MsgBase):

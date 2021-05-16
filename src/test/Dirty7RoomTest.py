@@ -75,7 +75,7 @@ class Dirty7RoomTest(unittest.TestCase, MsgTestLib):
         hostParameters = Dirty7Round.RoundParameters(["basic"], 2, 2, 1, 7, [7], 40,
                                                      stopPoints=stopPoints,
                                                      scoringSystems=['standard'])
-        room = Dirty7Room.Dirty7Room("dirty7:1", "Dirty7 #1", hostParameters)
+        room = Dirty7Room.Dirty7Room("dirty7:1", "Dirty7 #1", None, hostParameters)
 
         ws1 = 1
         ws2 = 2
@@ -569,7 +569,7 @@ class Dirty7RoomTest(unittest.TestCase, MsgTestLib):
 
         hostParameters = Dirty7Round.RoundParameters(["basic"], 2, 2, 1, 7, [7],
                                                      40, 100, ['standard'])
-        room = Dirty7Room.Dirty7Room("dirty7:1", "Dirty7 #1", hostParameters)
+        room = Dirty7Room.Dirty7Room("dirty7:1", "Dirty7 #1", None, hostParameters)
 
         ws1 = 1
         ws2 = 2
@@ -678,4 +678,5 @@ def testTrace():
     trace(Level.play, "foo", "bar")
     trace(Level.info, "foo", "bar")
     trace(Level.debug, "foo", "bar")
+    trace(Level.db, "foo", "bar")
 testTrace()

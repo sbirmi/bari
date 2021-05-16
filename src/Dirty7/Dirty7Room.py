@@ -54,8 +54,8 @@ class Dirty7Room(GamePlugin):
     As soon as the websocket sends a valid JOIN message,
         playerByWs[ws] == Player(..)
     """
-    def __init__(self, path, name, hostParameters):
-        GamePlugin.__init__(self, path, name)
+    def __init__(self, path, name, storage, hostParameters):
+        GamePlugin.__init__(self, path, name, storage=storage)
         self.hostParameters = hostParameters
 
         self.gameState = StateWaitingForPlayers()
