@@ -179,6 +179,7 @@ When KICKOFF has been received, public-msg sent to everyone for the word then it
  {"team": <int>,
   "player": <str>,
   "state": IN_PLAY,
+  "utcTimeout": <utc-timestamp>:float,
  }
 ]
 ```

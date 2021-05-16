@@ -1,6 +1,7 @@
 """Turn manager. Starts new turns etc"""
 
 from collections import defaultdict
+import datetime
 from enum import Enum
 import random
 
@@ -21,6 +22,9 @@ from Taboo.Word import (
         Word,
         WordState,
 )
+
+def expiryEpoch(turnDurationSec):
+    return (datetime.datetime.utcnow() + datetime.timedelta(turnDurationSec)).timestamp()
 
 class TurnMgrState(Enum):
     GAME_START_WAIT = 0
@@ -61,6 +65,7 @@ class TurnManager:
         self._curTurn = None # Points to the current turn in play
         self._activePlayer = None
         self._waitForKickoffMsgSrc = MsgSrc(self._allConns)
+        self._utcTimeout = None # UTC epoch of when this turn expires
 
         self._state = TurnMgrState.GAME_START_WAIT
 
@@ -190,6 +195,7 @@ class TurnManager:
 
         ctx = {"turnId": self._curTurnId}
         self._txQueue.put_nowait(TimerRequest(self.turnDurationSec, self.timerExpiredCb, ctx))
+        self._utcTimeout = expiryEpoch(self.turnDurationSec)
 
         assert self.startNextWord() is True, "Must always be able to start a new word"
         return True
@@ -332,7 +338,8 @@ class TurnManager:
         turn = Word(self._curTurnId, nextWordId, secret, disallowed,
                     self.activePlayer, [team for team in self._teams.values()
                                    if team != self.activePlayer.team],
-                    self._allConns)
+                    self._allConns,
+                    self._utcTimeout)
         self._wordsByTurnId[self._curTurnId].append(turn)
 
         self._curTurn = turn
