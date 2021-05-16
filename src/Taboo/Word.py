@@ -98,6 +98,7 @@ class Word:
 
         # If the turn isn't in play, there is no private messaging needed.
         if self._privateMsgSrc:
+            self._privateMsgSrc.setMsgs([]) # Reset previous messages
             self._privateMsgSrc = None
 
         msg = ["TURN", self._turnId, self._wordId,

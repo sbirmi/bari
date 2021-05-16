@@ -133,5 +133,6 @@ class Timer:
         trace(Level.msg, "Starting sleep for", self._qmsg)
         await asyncio.sleep(self._qmsg.afterSec)
         trace(Level.msg, "Firing callback for", self._qmsg)
-        await self._qmsg.cb(self._qmsg.ctx)
+        self._qmsg.cb(self._qmsg.ctx)
+        trace(Level.msg, "Callback returned for", self._qmsg)
         del timerByQmsg[self._qmsg] # This is funky? Losing reference to self
