@@ -284,7 +284,7 @@ class TabooRoom(GamePlugin):
         # A new player joins
         if not player:
             team = self.__getTeam(teamNumber)
-            player = TabooPlayer(self.txQueue, playerName, team)
+            player = TabooPlayer(self.txQueue, self.conns, playerName, team)
             #A late-joinee joins in ready state
             player.ready = self.state != GameState.WAITING_TO_START
             self.__finalizeJoin(ws, player)

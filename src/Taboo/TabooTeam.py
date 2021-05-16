@@ -16,16 +16,15 @@ class TabooTeam:
     """
     def __init__(self, txQueue, allConns, teamNumber):
         self.txQueue = txQueue
-        self.allConns = allConns
         self.teamNumber = teamNumber
 
-        self.teamStatusMsgSrc = MsgSrc(self.allConns)
+        self.teamStatusMsgSrc = MsgSrc(allConns)
 
         self.members = {}
         self.conns = Connections(self.txQueue)
-        self.updateSetMsgs()
+        self._updateMsgSrc()
 
-    def updateSetMsgs(self):
+    def _updateMsgSrc(self):
         self.teamStatusMsgSrc.setMsgs([
             Jmai(["TEAM-STATUS", self.teamNumber, list(self.members)], None),
         ])
@@ -41,7 +40,7 @@ class TabooTeam:
             return
 
         self.members[player.name] = player
-        self.updateSetMsgs()
+        self._updateMsgSrc()
 
     def getPlayer(self, playerName):
         """ Gets the player assocaited with that name.
