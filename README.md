@@ -9,6 +9,9 @@ Requirements
 
 1. python3
 2. websockets
+3. pyyaml
+4. pylint (recommended for development)
+5. coverage (recommended for development)
 
 
 Setup
@@ -17,7 +20,7 @@ Setup
     git clone https://github.com/sbirmi/bari.git
     python3 -m venv bari
     source bari/bin/activate
-    pip install websockets
+    pip install websockets pyyaml
 
 
 Running the game server

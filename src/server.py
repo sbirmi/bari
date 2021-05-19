@@ -22,6 +22,7 @@ from fwk.ServerQueueTask import (
         giByPath,
         giRxMsg,
         registerGameClass,
+        timerAdd,
         txQueue,
         wsPathAdd,
         wsPathRemove,
@@ -35,6 +36,7 @@ from fwk.Msg import (
         InternalRegisterGi,
         ClientRxMsg,
         ClientTxMsg,
+        TimerRequest,
 )
 from fwk.MsgType import (
         MTYPE_ERROR,
@@ -46,6 +48,7 @@ from fwk.Trace import (
 )
 import Chat.ChatLobbyPlugin
 import Dirty7.Dirty7Lobby
+import Taboo.TabooLobby
 
 
 WsIdAllocator = itertools.count()
@@ -132,6 +135,10 @@ async def giTxQueue(queue):
             giRxMsg(LOBBY_PATH, qmsg)
             continue
 
+        if isinstance(qmsg, TimerRequest):
+            await timerAdd(qmsg)
+            continue
+
         try:
             msg = json.dumps(qmsg.jmsg)
         except TypeError as exc:
@@ -166,6 +173,7 @@ def main(wsAddr="0.0.0.0"):
             fwk.LobbyPlugin.plugin(),
             Chat.ChatLobbyPlugin.plugin(),
             Dirty7.Dirty7Lobby.plugin(args.d7_storage),
+            Taboo.TabooLobby.plugin(),
     ]
     for plugin in plugins:
         registerGameClass(plugin)

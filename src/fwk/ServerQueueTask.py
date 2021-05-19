@@ -115,3 +115,24 @@ def registerGameClass(gi):
             asyncio.get_event_loop().create_task(gi.worker())
 
     GiRxQueueByPath[gi.path] = giRxQueue
+
+# -------------------------------------
+# Timer handling
+
+timerByQmsg = {}
+
+async def timerAdd(qmsg):
+    timerByQmsg[qmsg] = Timer(qmsg)
+
+class Timer:
+    def __init__(self, qmsg):
+        self._qmsg = qmsg
+        self._task = asyncio.ensure_future(self._job())
+
+    async def _job(self):
+        trace(Level.msg, "Starting sleep for", self._qmsg)
+        await asyncio.sleep(self._qmsg.afterSec)
+        trace(Level.msg, "Firing callback for", self._qmsg)
+        self._qmsg.cb(self._qmsg.ctx)
+        trace(Level.msg, "Callback returned for", self._qmsg)
+        del timerByQmsg[self._qmsg] # This is funky? Losing reference to self

@@ -1,5 +1,5 @@
 if test "$VIRTUAL_ENV" = "" ; then
-   echo "Running outside virtualenv. Run against from inside the venv"
+   echo "Running outside virtualenv. Run again from inside the venv"
    exit 1
 fi
 
