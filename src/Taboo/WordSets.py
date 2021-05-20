@@ -36,10 +36,16 @@ class WordSet:
         self.name = name
         self.path = path
 
-        self.data = yaml.safe_load(open(self.path))
+        self.data = {}
+        self.allWords = {}
+        self.loadData()
 
-        self.allWords = set(self.data.get('words', {}))
         self._usedWordsByRequestor = defaultdict( set )
+
+    def loadData(self):
+        self.data = yaml.safe_load(open(self.path))
+        self.allWords = set(self.data.get('words', {}))
+        trace(Level.info, "Loaded", len(self.allWords), "words")
 
     def __str__(self):
         return "WordSet:{}".format(self.name)
