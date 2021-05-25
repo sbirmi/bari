@@ -285,19 +285,18 @@ class TabooRoom(GamePlugin):
         if not player:
             team = self.__getTeam(teamNumber)
             player = TabooPlayer(self.txQueue, self.conns, playerName, team)
-            #A late-joinee joins in ready state
+            # A late-joinee joins in ready state
             player.ready = self.state != GameState.WAITING_TO_START
-            self.__finalizeJoin(ws, player)
-            #self.processEvent(PlayerJoin(player))
-            return True
-
-        #new join-request for an existing player will be accepted
-        #but we ignore the requested team and associate the player to the original team
-        if teamNumber != player.team.teamNumber:
-            trace(Level.warn, "Player {} forced to join their "
-                "original team {}".format(player.name, player.team.teamNumber))
+        else:
+            # New join-request for an existing player will be accepted
+            # but we ignore the requested team and associate the player
+            # to the original team
+            if teamNumber != player.team.teamNumber:
+                trace(Level.warn, "Player {} forced to join their "
+                    "original team {}".format(player.name, player.team.teamNumber))
 
         self.__finalizeJoin(ws, player)
+        self.publishGiStatus()
         return True
 
     def getPlayer(self, playerName):

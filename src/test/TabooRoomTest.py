@@ -188,6 +188,16 @@ class TabooRoomTest(unittest.TestCase, MsgTestLib):
                         {101}),
             ClientTxMsg(["TEAM-STATUS", 1, ["sb1"]], {101}),
             ClientTxMsg(["JOIN-OKAY", "sb1", 1], {ws1}, ws1),
+            InternalGiStatus([
+                {"hostParameters": {"numTeams": 2,
+                                    "turnDurationSec": 30,
+                                    "wordSets": ["test"],
+                                    "numTurns": 1},
+                 "gameState": "WAITING_TO_START",
+                 "clientCount": {1: {'sb1': 1}, 2: {}},
+                 "winners": []
+                }
+            ], "taboo:1"),
         ], anyOrder=True)
 
         #Join more players
@@ -211,6 +221,17 @@ class TabooRoomTest(unittest.TestCase, MsgTestLib):
             ClientTxMsg(['PLAYER-STATUS', 'xx', {'numConns': 1, 'ready': False, 'turnsPlayed': 0}],
                         {101, 102, 201, 202, 203, 1001}),
             ClientTxMsg(["JOIN-OKAY", "xx", 1], {ws2}, ws2),
+            InternalGiStatus([
+                {"hostParameters": {"numTeams": 2,
+                                    "turnDurationSec": 30,
+                                    "wordSets": ["test"],
+                                    "numTurns": 1},
+                 "gameState": "WAITING_TO_START",
+                 "clientCount": {1: {'sb1': 1, 'sb2': 1, 'xx': 1},
+                                 2: {'jg1': 1, 'jg2': 1, 'jg3': 1}},
+                 "winners": []
+                }
+            ], "taboo:1"),
         ], anyOrder=True)
 
         #Now run a bunch of new JOINs on team 2
@@ -230,6 +251,17 @@ class TabooRoomTest(unittest.TestCase, MsgTestLib):
             ClientTxMsg(['PLAYER-STATUS', 'yy', {'numConns': 1, 'ready': False, 'turnsPlayed': 0}],
                         {101, 102, 201, 202, 203, 1001, 204, 205, 1002}),
             ClientTxMsg(["JOIN-OKAY", "yy", 1], {ws2}, ws2),
+            InternalGiStatus([
+                {"hostParameters": {"numTeams": 2,
+                                    "turnDurationSec": 30,
+                                    "wordSets": ["test"],
+                                    "numTurns": 1},
+                 "gameState": "WAITING_TO_START",
+                 "clientCount": {1: {'sb1': 1, 'sb2': 1, 'xx': 1, 'yy': 1},
+                     2: {'jg1': 1, 'jg2': 1, 'jg3': 1, 'jg4': 1, 'jg5': 1}},
+                 "winners": []
+                }
+            ], "taboo:1"),
         ], anyOrder=True)
 
         ws2 = ws2 + 1
@@ -244,6 +276,17 @@ class TabooRoomTest(unittest.TestCase, MsgTestLib):
             ClientTxMsg(['PLAYER-STATUS', 'zz', {'numConns': 1, 'ready': False, 'turnsPlayed': 0}],
                         {101, 102, 201, 202, 203, 1001, 204, 205, 1002, 1003}),
             ClientTxMsg(["JOIN-OKAY", "zz", 1], {ws2}, ws2),
+            InternalGiStatus([
+                {"hostParameters": {"numTeams": 2,
+                                    "turnDurationSec": 30,
+                                    "wordSets": ["test"],
+                                    "numTurns": 1},
+                 "gameState": "WAITING_TO_START",
+                 "clientCount": {1: {'sb1': 1, 'sb2': 1, 'xx': 1, 'yy': 1, 'zz': 1},
+                     2: {'jg1': 1, 'jg2': 1, 'jg3': 1, 'jg4': 1, 'jg5': 1}},
+                 "winners": []
+                }
+            ], "taboo:1"),
         ], anyOrder=True)
 
         #A JOIN from an unrecognized ws ofc leads to assert
@@ -258,7 +301,18 @@ class TabooRoomTest(unittest.TestCase, MsgTestLib):
             ClientTxMsg(['PLAYER-STATUS', 'jg1', {'numConns': 2, 'ready': False, 'turnsPlayed': 0}],
                         {101, 102, 201, 202, 203, 1001, 204, 205, 1002, 1003, 2001}),
             ClientTxMsg(["JOIN-OKAY", "jg1", 2], {2001}, 2001),
-        ])
+            InternalGiStatus([
+                {'hostParameters': {'numTeams': 2,
+                                    'turnDurationSec': 30,
+                                    'wordSets': ['test'],
+                                    'numTurns': 1},
+                 'gameState': 'WAITING_TO_START',
+                 'clientCount': {1: {'sb1': 1, 'sb2': 1, 'xx': 1, 'yy': 1, 'zz': 1},
+                                 2: {'jg1': 2, 'jg2': 1, 'jg3': 1, 'jg4': 1, 'jg5': 1}},
+                 'winners': []
+                }
+            ], "taboo:1"),
+        ], anyOrder=True)
 
         #A re-JOIN from a plyr forces it to its original team
         env.room.processConnect(2002)
@@ -268,7 +322,18 @@ class TabooRoomTest(unittest.TestCase, MsgTestLib):
             ClientTxMsg(['PLAYER-STATUS', 'jg1', {'numConns': 3, 'ready': False, 'turnsPlayed': 0}],
                         {101, 102, 201, 202, 203, 1001, 204, 205, 1002, 1003, 2001, 2002}),
             ClientTxMsg(["JOIN-OKAY", "jg1", 2], {2002}, 2002),
-        ])
+            InternalGiStatus([
+                {'hostParameters': {'numTeams': 2,
+                                    'turnDurationSec': 30,
+                                    'wordSets': ['test'],
+                                    'numTurns': 1},
+                 'gameState': 'WAITING_TO_START',
+                 'clientCount': {1: {'sb1': 1, 'sb2': 1, 'xx': 1, 'yy': 1, 'zz': 1},
+                                 2: {'jg1': 3, 'jg2': 1, 'jg3': 1, 'jg4': 1, 'jg5': 1}},
+                 'winners': []
+                }
+            ], "taboo:1"),
+        ], anyOrder=True)
 
     def testKickoff(self):
         env = self.setUpTabooRoom()
