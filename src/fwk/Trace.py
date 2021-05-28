@@ -42,6 +42,16 @@ TRACE_LEVELS = {Level.error, Level.warn,
                 Level.conn,
                 Level.db}
 
+# Trace output
+traceout=sys.stderr
+
+def setTraceFile(filename):
+    global traceout # pylint: disable=global-statement
+    if filename:
+        traceout = open(filename, "a") # pylint: disable=consider-using-with
+    else:
+        traceout = sys.stderr
+
 def trace(lvl, *msg):
     if TRACE_LEVELS is None:
         return
@@ -54,7 +64,9 @@ def trace(lvl, *msg):
     currentframe = inspect.currentframe()
     caller = inspect.getouterframes(currentframe, 2)[1]
     framedesc = "%s:%s %s" % (os.path.split(caller.filename)[-1], caller.lineno, caller.function)
-    sys.stderr.write("%-26s %-5s %-40s" % (now, Level.strep[lvl], framedesc))
+    traceout.write("%-26s %-5s %-40s" % (now, Level.strep[lvl], framedesc))
     for m in msg:
-        sys.stderr.write(" " + str(m))
-    sys.stderr.write("\n")
+        traceout.write(" " + str(m))
+    traceout.write("\n")
+
+    traceout.flush()

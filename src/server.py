@@ -44,6 +44,7 @@ from fwk.MsgType import (
 import fwk.LobbyPlugin
 from fwk.Trace import (
         Level,
+        setTraceFile,
         trace,
 )
 import Chat.ChatLobbyPlugin
@@ -161,10 +162,13 @@ def main(wsAddr="0.0.0.0"):
                         help="Dirty7 sqlite3 storage file (default={})".format(
                             Dirty7.Dirty7Lobby.DefaultStorageFile),
                         default=Dirty7.Dirty7Lobby.DefaultStorageFile)
+    parser.add_argument("--trace-file",
+                        help="Trace file (default=STDERR)")
 
     args = parser.parse_args()
+    setTraceFile(args.trace_file)
 
-    print("Starting server. Listening on", wsAddr, "port", args.port)
+    trace(Level.info, "Starting server. Listening on", wsAddr, "port", args.port)
     wsServer = websockets.serve(rxClient, wsAddr, args.port) # pylint: disable=no-member
 
     asyncio.get_event_loop().create_task(giTxQueue(txQueue()))
