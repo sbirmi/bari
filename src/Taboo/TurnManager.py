@@ -24,7 +24,8 @@ from Taboo.Word import (
 )
 
 def expiryEpoch(turnDurationSec):
-    return datetime.datetime.utcnow().timestamp() + turnDurationSec
+    utcnow = datetime.datetime.now(tz=datetime.timezone.utc).timestamp()
+    return utcnow + turnDurationSec
 
 class TurnMgrState(Enum):
     GAME_START_WAIT = 0
