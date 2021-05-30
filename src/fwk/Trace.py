@@ -48,7 +48,7 @@ traceout=sys.stderr
 def setTraceFile(filename):
     global traceout # pylint: disable=global-statement
     if filename:
-        traceout = open(filename, "a") # pylint: disable=consider-using-with
+        traceout = open(filename, "a") # pylint: disable=bad-option-value
     else:
         traceout = sys.stderr
 

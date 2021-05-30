@@ -118,7 +118,9 @@ class Word:
         trace(Level.play, "state", state.name)
         if state == WordState.COMPLETED:
             self._score = [self._player.team.teamNumber]
-        else:
+        elif state == WordState.DISCARDED:
             self._score = [team.teamNumber for team in self._otherTeams]
+        elif state == WordState.TIMED_OUT:
+            self._score = []
         self._state = state
         self.updateMsgs()
