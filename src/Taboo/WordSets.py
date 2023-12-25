@@ -20,7 +20,7 @@ WORDSETS_PATH = os.path.join(os.path.split(__file__)[0], "wordsets")
 SupportedWordSets = {}
 
 def randomWord(wordPool):
-    return random.sample(wordPool, 1)[ 0 ]
+    return random.sample(list(wordPool), 1)[ 0 ]
 
 class WordSet:
     """

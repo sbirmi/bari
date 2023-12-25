@@ -44,7 +44,7 @@ class ClientTxMsg(MsgBase):
     def __str__(self):
         # pylint: disable=bad-super-call
         return (super(self.__class__, self).__str__() +
-                " toWss=" + ",".join(str(w) for w in self.toWss) +
+                " toWss=" + ",".join(str(w) for w in sorted(self.toWss)) +
                 " jmsg=" + str(self.jmsg))
 
 class InternalRegisterGi(MsgBase):
