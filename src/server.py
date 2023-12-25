@@ -49,6 +49,7 @@ from fwk.Trace import (
 )
 import Chat.ChatLobbyPlugin
 import Dirty7.Dirty7Lobby
+import Durak.DurakLobbyPlugin
 import Taboo.TabooLobby
 
 
@@ -177,6 +178,7 @@ def main(wsAddr="0.0.0.0"):
             fwk.LobbyPlugin.plugin(),
             Chat.ChatLobbyPlugin.plugin(),
             Dirty7.Dirty7Lobby.plugin(args.d7_storage),
+            Durak.DurakLobbyPlugin.plugin(),
             Taboo.TabooLobby.plugin(),
     ]
     for plugin in plugins:
