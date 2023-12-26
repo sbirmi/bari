@@ -4,7 +4,6 @@ from fwk.MsgSrc import (
         Jmai,
         MsgSrc,
 )
-from Taboo.TabooTeam import TabooTeam
 
 class TabooPlayer:
 

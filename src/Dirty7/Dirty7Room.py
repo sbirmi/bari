@@ -17,7 +17,7 @@ from fwk.Trace import (
         Level,
         trace,
 )
-from Dirty7.Card import (
+from Common.Card import (
         Card,
 )
 from Dirty7.Dirty7Game import (
@@ -42,7 +42,6 @@ from Dirty7.Events import (
         StartRound,
         StopRound,
 )
-from Dirty7.Exceptions import InvalidPlayException
 
 validPlayerNameRe = re.compile("^[a-zA-Z0-9_]+$")
 validPasswdRe = re.compile("^[a-zA-Z0-9_]+$")

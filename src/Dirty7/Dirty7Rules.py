@@ -6,13 +6,12 @@ not retained locally.
 
 import random
 
-from Dirty7 import Card
+from Common import Card
 from Dirty7 import Dirty7Round
 from Dirty7.Events import (
         AdvanceTurn,
         Declare,
 )
-from Dirty7.Exceptions import InvalidPlayException
 from fwk.Trace import (
         Level,
         trace,
