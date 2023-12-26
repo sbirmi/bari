@@ -1,6 +1,7 @@
 """Defines a durak room in bari"""
 
 from enum import Enum
+import random
 
 from fwk.GamePlugin import GamePlugin
 from fwk.Msg import (
@@ -10,6 +11,7 @@ from fwk.Msg import (
 
 from Durak.HostParametersMsgSrc import HostParametersMsgSrc
 from Durak.Player import Player
+from Durak.Round import Round
 
 class GameState(Enum):
     WAITING_TO_START = 1
@@ -26,10 +28,13 @@ class Room(GamePlugin):
         self.playerByWs = {}   #<ws:player>
         self.playerByName = {} # name --> player
 
+        self.playerTurnOrder = []
+        self.roundNum = 0
+        self.rounds = []
+
         # Initialized after queues are set up
         self.hostParametersMsgSrc = None
         self.gameOverMsgSrc = None
-        self.turnMgr = None
 
     def initGame(self):
         """Called one time after queues are instantiated"""
@@ -71,6 +76,7 @@ class Room(GamePlugin):
 
     #--------------------------------------------
     # process messages
+
     def __processJoin(self, qmsg):
         """
         ["JOIN", playerName]
@@ -101,9 +107,10 @@ class Room(GamePlugin):
     def joinPlayer(self, ws, playerName):
         player = self.playerByName.get(playerName)
 
+        numPlayersBeforeJoin = len(self.playerByName)
         if not player:
             # New player
-            if len(self.playerByName) == self.hostParameters.numPlayers:
+            if numPlayersBeforeJoin == self.hostParameters.numPlayers:
                 # Can't accept new players
                 self.txQueue.put_nowait(ClientTxMsg(
                     ["JOIN-BAD", "Enough players joined already/bad player name",
@@ -120,5 +127,26 @@ class Room(GamePlugin):
         self.txQueue.put_nowait(ClientTxMsg(["JOIN-OKAY", player.name],
             {ws}, initiatorWs=ws))
 
+        if (numPlayersBeforeJoin + 1 == self.hostParameters.numPlayers and
+            len(self.playerByName) == self.hostParameters.numPlayers):
+            # Enough players joined
+            self.startRound()
+
         self.publishGiStatus()
         return True
+
+    def startRound(self):
+        if not self.rounds:
+            # Starting first round
+            self.playerTurnOrder = list(self.playerByName)
+            random.shuffle(self.playerTurnOrder)
+            # - Setup player turn order
+
+        self.roundNum += 1
+        self.rounds.append(Round(
+            self.conns,
+            self.roundNum,
+            self.hostParameters,
+            self.playerByName,
+            self.playerTurnOrder,
+        ))
