@@ -29,12 +29,12 @@ class Room(GamePlugin):
         self.playerByName = {} # name --> player
 
         self.playerTurnOrder = []
-        self.roundNum = 0
-        self.rounds = []
+        self.round = None
 
         # Initialized after queues are set up
         self.hostParametersMsgSrc = None
         self.gameOverMsgSrc = None
+        self.scoreMsgSrc = None
 
     def initGame(self):
         """Called one time after queues are instantiated"""
@@ -130,23 +130,24 @@ class Room(GamePlugin):
         if (numPlayersBeforeJoin + 1 == self.hostParameters.numPlayers and
             len(self.playerByName) == self.hostParameters.numPlayers):
             # Enough players joined
-            self.startRound()
+            self.startGame()
 
         self.publishGiStatus()
         return True
 
-    def startRound(self):
-        if not self.rounds:
+    def startGame(self):
+        if not self.round:
             # Starting first round
+            # - Setup player turn order
             self.playerTurnOrder = list(self.playerByName)
             random.shuffle(self.playerTurnOrder)
-            # - Setup player turn order
 
-        self.roundNum += 1
-        self.rounds.append(Round(
-            self.conns,
-            self.roundNum,
-            self.hostParameters,
-            self.playerByName,
-            self.playerTurnOrder,
-        ))
+            # - Create round object
+            self.round = Round(
+                self.conns,
+                self.hostParameters,
+                self.playerByName,
+                self.playerTurnOrder,
+            )
+
+        self.round.startRound()

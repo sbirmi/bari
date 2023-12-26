@@ -25,6 +25,31 @@ Client --> server
 ```
 ---
 
+Server --> client
+
+```
+    ["ROUND",
+     {# If the round is on-going
+      playerTurnOrder=[], # list of player names
+      attackers=[],       # list of player names
+      <defender:str>,     # player name
+
+      # If the round is over
+      playerLost=<playerName:str>,
+     }]
+
+    ["TABLE-CARDS",
+     trumpSuit: str,
+     numDrawPileCards : int,  # includes face up card
+     bottomCard : [suit, card] or null,
+     attackPilesByPlayerName : {"playerName": [
+        [card1, ...], # pile 1
+        ],
+     },
+    ]
+
+    ["PLAYER-HAND", name, numCards, cards (optional)]
+```
 # Host parameters
 
 1. Number of players: 2..6
@@ -64,7 +89,6 @@ Server --> Client
 * numCardsToStart = 6
 
 ## Round
-* roundNum
 * roundParameters (RoundParameters)
 * roundStatus (RoundStatus)
 * ruleEngine (RuleEngine)

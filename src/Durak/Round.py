@@ -18,7 +18,6 @@ class RoundState(Enum):
 class Round(MsgSrc):
     """
     ["ROUND",
-     <roundNum:int>,
      {# If the round is on-going
       playerTurnOrder=[], # list of player names
       attackers=[],       # list of player names
@@ -29,30 +28,24 @@ class Round(MsgSrc):
      }]
     """
     def __init__(self, conns,
-                 roundNum,
                  roundParameters,
                  playerByName,
                  playerTurnOrder,
+                 roundNum=0,
                  startTurnIdx=0):
         super(Round, self).__init__(conns)
 
-        self.roundNum = roundNum
         self.roundParameters = roundParameters
         self.playerByName = playerByName
         self.playerTurnOrder = playerTurnOrder
         self.startTurnIdx = startTurnIdx
 
+        self.roundNum = roundNum
         self.roundState = RoundState.WAIT_FIRST_ATTACK
         self.attackerIdxs = []
         self.defenderIdx = None
         self.playerLost = None
-
-        # Sets up the table and deals out cards
-        self.tableCardsMsgSrc = TableCardsMsgSrc(
-                self._conns, roundParameters,
-                {pn: player.hand for pn, player in self.playerByName.items()})
-
-        self.startTurn()
+        self.tableCardsMsgSrc = None
 
     def firstPlayerIdxWithCards(self, idx):
         numPlayers = len(self.playerByName)
@@ -64,6 +57,20 @@ class Round(MsgSrc):
                 return j
 
         return None
+
+    def startRound(self):
+        self.roundNum += 1
+        self.roundState = RoundState.WAIT_FIRST_ATTACK
+        self.attackerIdxs = []
+        self.defenderIdx = None
+        self.playerLost = None
+
+        # Sets up the table and deals out cards
+        self.tableCardsMsgSrc = TableCardsMsgSrc(
+                self._conns, self.roundParameters,
+                {pn: player.hand for pn, player in self.playerByName.items()})
+
+        self.startTurn()
 
     def startTurn(self):
         # Assert the round isn't over
