@@ -3,11 +3,14 @@
 from enum import Enum
 import random
 
+from fwk.Exceptions import InvalidDataException
 from fwk.GamePlugin import GamePlugin
 from fwk.Msg import (
         ClientTxMsg,
         InternalGiStatus,
 )
+
+from Common.Card import Card
 
 from Durak.HostParametersMsgSrc import HostParametersMsgSrc
 from Durak.Player import Player
@@ -47,6 +50,9 @@ class Room(GamePlugin):
         if qmsg.jmsg[0] == "JOIN":
             return self.__processJoin(qmsg)
 
+        if qmsg.jmsg[0] == "ATTACK":
+            return self.__processAttack(qmsg)
+
         return True
 
     def postProcessConnect(self, ws):
@@ -75,13 +81,20 @@ class Room(GamePlugin):
             [{"clients": self.conns.count()}], self.path))
 
     #--------------------------------------------
-    # process messages
+    # Join handling
 
     def __processJoin(self, qmsg):
         """
         ["JOIN", playerName]
         """
         ws = qmsg.initiatorWs
+
+        if self.state == GameState.GAME_OVER:
+            self.txQueue.put_nowait(ClientTxMsg(["JOIN-BAD",
+                                                 "Game over"],
+                                                {ws}, initiatorWs=ws))
+            return True
+
         assert ws in self.playerByWs, "Join request from an unrecognized connection"
 
         if self.playerByWs[ws]:
@@ -138,12 +151,16 @@ class Room(GamePlugin):
     def startGame(self):
         if not self.round:
             # Starting first round
+            self.state = GameState.RUNNING
+
             # - Setup player turn order
             self.playerTurnOrder = list(self.playerByName)
             random.shuffle(self.playerTurnOrder)
 
+
             # - Create round object
             self.round = Round(
+                self.txQueue,
                 self.conns,
                 self.hostParameters,
                 self.playerByName,
@@ -151,3 +168,54 @@ class Room(GamePlugin):
             )
 
         self.round.startRound()
+
+    #--------------------------------------------
+    # Attack handling
+
+    def __processAttack(self, qmsg):
+        """
+        ["ATTACK", [ attackCard1, attackCard2, ... ]]
+        """
+        ws = qmsg.initiatorWs
+
+        if self.state != GameState.RUNNING:
+            self.txQueue.put_nowait(ClientTxMsg(["ATTACK-BAD",
+                                                 "Game not running"],
+                                                {ws}, initiatorWs=ws))
+            return True
+
+        assert ws in self.playerByWs, "Attack request from an unrecognized connection"
+
+        player = self.playerByWs[ws]
+
+        if player is None:
+            # Spectators are added as None to playerByWs
+            self.txQueue.put_nowait(ClientTxMsg(["ATTACK-BAD",
+                                                 "Must join the game first"],
+                                                {ws}, initiatorWs=ws))
+            return True
+
+        if len(qmsg.jmsg) != 2:
+            self.txQueue.put_nowait(ClientTxMsg(["ATTACK-BAD", "Invalid message length"],
+                                                {ws}, initiatorWs=ws))
+            return True
+
+        _, attacks = qmsg.jmsg
+
+        if not isinstance(attacks, list):
+            self.txQueue.put_nowait(ClientTxMsg(["ATTACK-BAD", "Invalid attacks", attacks],
+                                                {ws}, initiatorWs=ws))
+            return True
+
+        cards = []
+        for cardJmsg in attacks:
+            try:
+                card = Card.fromJmsg(cardJmsg)
+            except InvalidDataException as _:
+                self.txQueue.put_nowait(ClientTxMsg(["ATTACK-BAD", "Invalid card", cardJmsg],
+                                                    {ws}, initiatorWs=ws))
+                return True
+
+            cards.append(card)
+
+        return self.round.playerAttack(ws, player, cards)

@@ -57,6 +57,25 @@ class PlayerHand:
         self.cards = cards
         self.refresh()
 
+    def hasCards(self, cards):
+        handCards = list(self.cards)
+        for card in cards:
+            try:
+                idx = handCards.index(card)
+            except ValueError:
+                return False
+
+            handCards.pop(idx)
+
+        return True
+
+    def removeCards(self, cards):
+        for card in cards:
+            idx = self.cards.index(card)
+            self.cards.pop(idx)
+
+        self.refresh()
+
     def refresh(self):
         msg = ["PLAYER-HAND",
                self.name,

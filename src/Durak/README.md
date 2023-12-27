@@ -39,17 +39,42 @@ Server --> client
      }]
 
     ["TABLE-CARDS",
-     trumpSuit: str,
-     numDrawPileCards : int,  # includes face up card
-     bottomCard : [suit, card] or null,
-     attackPilesByPlayerName : {"playerName": [
+     {"trump": str,
+      "drawPileSize": int, # includes face up card
+      "bottomCard": [suit, card] or null,
+      "attacks": {"playerName": [
         [card1, ...], # pile 1
         ],
+        ...
      },
     ]
 
     ["PLAYER-HAND", name, numCards, cards (optional)]
+
+    ["PLAYER-STATUS", self.name, self.numConns()]
+    
 ```
+
+Client --> server
+```
+    ["ATTACK", [ attackCard1, attackCard2, ... ]]
+
+        ["ATTACK-OKAY"]
+        ["ATTACK-BAD", reason:str]
+
+    ["DEFEND", { attacker1Name: [], attacker2Name: [], ... }]
+
+        ["DEFEND-OKAY"]
+        ["DEFEND-BAD", reason:str]
+
+    ["DONE"]
+
+        ["DONE-OKAY"]
+        ["DONE-BAD", reason:str]
+
+```
+
+
 # Host parameters
 
 1. Number of players: 2..6
