@@ -53,6 +53,9 @@ class Room(GamePlugin):
         if qmsg.jmsg[0] == "ATTACK":
             return self.__processAttack(qmsg)
 
+        if qmsg.jmsg[0] == "DEFEND":
+            return self.__processDefend(qmsg)
+
         return True
 
     def postProcessConnect(self, ws):
@@ -207,6 +210,11 @@ class Room(GamePlugin):
                                                 {ws}, initiatorWs=ws))
             return True
 
+        if not attacks:
+            self.txQueue.put_nowait(ClientTxMsg(["ATTACK-BAD", "No cards specified"],
+                                                {ws}, initiatorWs=ws))
+            return True
+
         cards = []
         for cardJmsg in attacks:
             try:
@@ -219,3 +227,75 @@ class Room(GamePlugin):
             cards.append(card)
 
         return self.round.playerAttack(ws, player, cards)
+
+    #--------------------------------------------
+    # Defend handling
+
+    def __processDefend(self, qmsg):
+        """
+        ["DEFEND", [[attackCard1, defendCard1], ... ]]
+        """
+        ws = qmsg.initiatorWs
+
+        if self.state != GameState.RUNNING:
+            self.txQueue.put_nowait(ClientTxMsg(["DEFEND-BAD",
+                                                 "Game not running"],
+                                                {ws}, initiatorWs=ws))
+            return True
+
+        assert ws in self.playerByWs, "Defend request from an unrecognized connection"
+
+        player = self.playerByWs[ws]
+
+        if player is None:
+            # Spectators are added as None to playerByWs
+            self.txQueue.put_nowait(ClientTxMsg(["DEFEND-BAD",
+                                                 "Must join the game first"],
+                                                {ws}, initiatorWs=ws))
+            return True
+
+        if len(qmsg.jmsg) != 2:
+            self.txQueue.put_nowait(ClientTxMsg(["DEFEND-BAD", "Invalid message length"],
+                                                {ws}, initiatorWs=ws))
+            return True
+
+        _, defends = qmsg.jmsg
+
+        if not isinstance(defends, list):
+            self.txQueue.put_nowait(ClientTxMsg(["DEFEND-BAD", "Invalid defends", defends],
+                                                {ws}, initiatorWs=ws))
+            return True
+
+        if not defends:
+            self.txQueue.put_nowait(ClientTxMsg(["DEFEND-BAD", "No move specified", defends],
+                                                {ws}, initiatorWs=ws))
+            return True
+
+        defendCards = []
+        for attackDefend in defends:
+            if not isinstance(attackDefend, list):
+                self.txQueue.put_nowait(ClientTxMsg(
+                    ["DEFEND-BAD", "Invalid type for defense", attackDefend],
+                    {ws}, initiatorWs=ws))
+                return True
+
+            if len(attackDefend) != 2:
+                self.txQueue.put_nowait(ClientTxMsg(
+                    ["DEFEND-BAD", "Invalid length of defense", attackDefend],
+                    {ws}, initiatorWs=ws))
+                return True
+
+            attackDefendCards = []
+            for cardJmsg in attackDefend:
+                try:
+                    card = Card.fromJmsg(cardJmsg)
+                except InvalidDataException as _:
+                    self.txQueue.put_nowait(ClientTxMsg(["DEFEND-BAD", "Invalid card", cardJmsg],
+                                                        {ws}, initiatorWs=ws))
+                    return True
+
+                attackDefendCards.append(card)
+
+            defendCards.append(attackDefendCards)
+
+        return self.round.playerDefend(ws, player, defendCards)

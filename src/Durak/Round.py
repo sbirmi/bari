@@ -1,3 +1,4 @@
+from collections import defaultdict
 from enum import Enum
 import random
 
@@ -7,7 +8,10 @@ from fwk.MsgSrc import (
         MsgSrc
 )
 
-from Common.Card import Card
+from Common.Card import (
+        Card,
+        cardListContains,
+)
 
 class RoundState(Enum):
     WAIT_FIRST_ATTACK = 1
@@ -112,12 +116,8 @@ class Round(MsgSrc):
 
     #--------------------------------------------
     # Attack handling
-    def playerAttack(self, ws, attackingPlayer, attackCards):
-        if not attackCards:
-            self.txQueue.put_nowait(ClientTxMsg(["ATTACK-BAD", "No cards specified"],
-                                                {ws}, initiatorWs=ws))
-            return True
 
+    def playerAttack(self, ws, attackingPlayer, attackCards):
         if self.roundState not in {RoundState.WAIT_FIRST_ATTACK,
                                    RoundState.WAIT_DEFENSE_OR_ATTACK,
                                    RoundState.WAIT_NEXT_ATTACK,
@@ -221,6 +221,78 @@ class Round(MsgSrc):
         self.refresh()
         return True
 
+    #--------------------------------------------
+    # Defend handling
+
+    def playerDefend(self, ws, player, attackDefendCards):
+        """
+        attackDefendCards = [ [attackCard1, defendCard1], ... ]
+        """
+        # Ensure round state
+        if self.roundState == RoundState.ROUND_OVER:
+            self.txQueue.put_nowait(ClientTxMsg(["DEFEND-BAD", "Can't defend right now"],
+                                                {ws}, initiatorWs=ws))
+            return True
+
+        # Ensure player == defender
+        if player != self.defenderPlayer():
+            self.txQueue.put_nowait(ClientTxMsg(["DEFEND-BAD", "Not your turn to defend"],
+                                                {ws}, initiatorWs=ws))
+            return True
+
+        attackCards = [attackCard for attackCard, _ in attackDefendCards]
+        defendCards = [defendCard for _, defendCard in attackDefendCards]
+
+        # Ensure defender has all these cards
+        if not player.hand.hasCards(defendCards):
+            self.txQueue.put_nowait(ClientTxMsg(["DEFEND-BAD", "You don't have defending cards"],
+                                                {ws}, initiatorWs=ws))
+            return True
+
+        # Ensure each attack card is undefended
+        _, undefendedCards = self.tableCardsMsgSrc.attackDefendStatus()
+
+        if not cardListContains(undefendedCards, attackCards):
+            self.txQueue.put_nowait(ClientTxMsg(
+                ["DEFEND-BAD", "Some attacks cards being defended are invalid"],
+                 {ws}, initiatorWs=ws))
+            return True
+
+        # Ensure each defense is a valid defense
+        for attackCard, defendCard in attackDefendCards:
+            if attackCard.suit == defendCard.suit:
+                if attackCard.rank == 1:
+                    # Can't defend against an ace if defense is with same suit
+                    self.txQueue.put_nowait(ClientTxMsg(
+                        ["DEFEND-BAD", f"Can't defend against {attackCard} with {defendCard}"],
+                         {ws}, initiatorWs=ws))
+                    return True
+
+                if (defendCard.rank != 1 and defendCard.rank <= attackCard.rank and
+                    defendCard.rank <= attackCard.rank):
+                    self.txQueue.put_nowait(ClientTxMsg(
+                        ["DEFEND-BAD", f"Can't defend against {attackCard} with {defendCard}"],
+                         {ws}, initiatorWs=ws))
+                    return True
+
+            if defendCard.suit not in {attackCard.suit, self.tableCardsMsgSrc.trumpSuit}:
+                self.txQueue.put_nowait(ClientTxMsg(
+                    ["DEFEND-BAD",
+                     f"Can't defend against {attackCard} with {defendCard} (not trump)"],
+                     {ws}, initiatorWs=ws))
+                return True
+
+        # Update hand
+        self.tableCardsMsgSrc.updateDefend(player, attackDefendCards)
+
+        # Send DEFEND-OKAY
+        self.txQueue.put_nowait(ClientTxMsg(["DEFEND-OKAY"], {ws}, initiatorWs=ws))
+
+        # PENDING: Ensure if defender has no cards left, it's
+        # the end of this turn
+
+        return True
+
 class TableCardsMsgSrc(MsgSrc):
     """
     ["TABLE-CARDS",
@@ -307,6 +379,44 @@ class TableCardsMsgSrc(MsgSrc):
 
         # Remove cards from attacker's hand too
         attacker.hand.removeCards(cards)
+        self.refresh()
+
+    def updateDefend(self, defender, attackDefendCards):
+        # Remove cards from defender
+        defender.hand.removeCards((defendCard for _, defendCard in attackDefendCards))
+
+        # Update table cards with attacks that are covered
+        defendCardsByAttackCard = defaultdict(list)
+        for attackCard, defendCard in attackDefendCards:
+            defendCardsByAttackCard[attackCard].append(defendCard)
+
+        for attackPiles in self.attackPilesByPlayerName.values():
+            for pile in attackPiles:
+                if len(pile) == 2:
+                    # Already defended
+                    continue
+
+                attackCard = pile[0]
+                if attackCard not in defendCardsByAttackCard:
+                    # This attack wasn't defended against
+                    continue
+
+                # This card is now defended against
+                defenseCard = defendCardsByAttackCard[attackCard].pop()
+                pile.append(defenseCard)
+
+                if not defendCardsByAttackCard[attackCard]:
+                    # All defenses are used up
+                    del defendCardsByAttackCard[attackCard]
+
+                if not defendCardsByAttackCard:
+                    break
+
+            if not defendCardsByAttackCard:
+                break
+
+        # Done defending against attacks
+
         self.refresh()
 
     def refresh(self):

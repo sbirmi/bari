@@ -4,6 +4,8 @@ from fwk.MsgSrc import (
         MsgSrc,
 )
 
+from Common.Card import cardListContains
+
 class Player:
     def __init__(self, txQueue, allConns, name):
         """Creates a player
@@ -58,16 +60,7 @@ class PlayerHand:
         self.refresh()
 
     def hasCards(self, cards):
-        handCards = list(self.cards)
-        for card in cards:
-            try:
-                idx = handCards.index(card)
-            except ValueError:
-                return False
-
-            handCards.pop(idx)
-
-        return True
+        return cardListContains(self.cards, cards)
 
     def removeCards(self, cards):
         for card in cards:

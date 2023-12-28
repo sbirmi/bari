@@ -62,7 +62,7 @@ Client --> server
         ["ATTACK-OKAY"]
         ["ATTACK-BAD", reason:str]
 
-    ["DEFEND", { attacker1Name: [], attacker2Name: [], ... }]
+    ["DEFEND", [[attackCard1, defendCard1], ... ]]
 
         ["DEFEND-OKAY"]
         ["DEFEND-BAD", reason:str]
