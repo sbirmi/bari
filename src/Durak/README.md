@@ -1,5 +1,14 @@
 # Durak
 
+## Todo
+
+- GIVEUP from defender
+- playerAttack code reorg
+- attackers should be attackers - defenders
+- invoke isTurnOver at the end of any move
+- pass more parameters thru RoundParameters
+
+
 ---
 
 # Messages
@@ -71,6 +80,11 @@ Client --> server
 
         ["DONE-OKAY"]
         ["DONE-BAD", reason:str]
+
+    ["GIVEUP"]
+
+        ["GIVEUP-OKAY"]
+        ["GIVEUP-BAD", reason:str]
 
 ```
 
