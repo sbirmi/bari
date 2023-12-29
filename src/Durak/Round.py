@@ -15,9 +15,7 @@ from Common.Card import (
 
 class RoundState(Enum):
     WAIT_FIRST_ATTACK = 1
-    WAIT_DEFENSE_OR_ATTACK = 2
-    WAIT_NEXT_ATTACK = 3
-    WAIT_NEXT_ATTACK_OR_DEFENSE = 4
+    PAST_FIRST_ATTACK = 2
     ROUND_OVER = 5
 
 class Round(MsgSrc):
@@ -26,6 +24,7 @@ class Round(MsgSrc):
      {# If the round is on-going
       playerTurnOrder=[], # list of player names
       attackers=[],       # list of player names
+      done=[],            # list of player names
       <defender:str>,     # player name
      }]
     """
@@ -45,9 +44,10 @@ class Round(MsgSrc):
 
         self.roundNum = roundNum
         self.roundState = RoundState.WAIT_FIRST_ATTACK
-        self.attackerIdxs = []
-        self.defenderIdx = None
-        self.finishedPlayerIdxs = []
+        self.attackerIdxs = []          # Players that can attack in this turn
+        self.donePlayers = set()        # Players who don't want to attack anymore in this turn
+        self.defenderIdx = None         # Player who is defending in this turn
+        self.noCardsPlayerIdxs = []     # Players with 0 cards left
         self.tableCardsMsgSrc = None
 
     def getPlayersByIdxs(self, idxs):
@@ -76,8 +76,9 @@ class Round(MsgSrc):
         self.roundNum += 1
         self.roundState = RoundState.WAIT_FIRST_ATTACK
         self.attackerIdxs = []
+        self.donePlayers = set()
         self.defenderIdx = None
-        self.finishedPlayerIdxs = []
+        self.noCardsPlayerIdxs = []
 
         # Sets up the table and deals out cards
         self.tableCardsMsgSrc = TableCardsMsgSrc(
@@ -94,6 +95,7 @@ class Round(MsgSrc):
 
         self.attackerIdxs = [self.firstPlayerIdxWithCards(self.startTurnIdx)]
         self.defenderIdx = self.firstPlayerIdxWithCards(self.startTurnIdx + 1)
+        self.donePlayers = set()
 
         assert self.attackerIdxs[0] is not None
         assert self.defenderIdx is not None
@@ -108,6 +110,7 @@ class Round(MsgSrc):
             data.update({
                 "playerTurnOrder": self.playerTurnOrder,
                 "attackers": [self.playerTurnOrder[aidx] for aidx in self.attackerIdxs],
+                "done": [player.name for player in self.donePlayers],
                 "defender": self.playerTurnOrder[self.defenderIdx],
             })
         self.setMsgs([
@@ -118,17 +121,19 @@ class Round(MsgSrc):
     # Attack handling
 
     def playerAttack(self, ws, attackingPlayer, attackCards):
-        if self.roundState not in {RoundState.WAIT_FIRST_ATTACK,
-                                   RoundState.WAIT_DEFENSE_OR_ATTACK,
-                                   RoundState.WAIT_NEXT_ATTACK,
-                                   RoundState.WAIT_NEXT_ATTACK_OR_DEFENSE}:
+        if self.roundState == RoundState.ROUND_OVER:
             self.txQueue.put_nowait(ClientTxMsg(["ATTACK-BAD", "Can't attack right now"],
+                                                {ws}, initiatorWs=ws))
+            return True
+
+        if attackingPlayer in self.donePlayers:
+            self.txQueue.put_nowait(ClientTxMsg(["ATTACK-BAD", "Can't attack after declaring done"],
                                                 {ws}, initiatorWs=ws))
             return True
 
         # Defender can't attack if there is nobody left to defend
         defenderPlayer = self.defenderPlayer()
-        if (len(self.attackerIdxs) + len(self.finishedPlayerIdxs) + 1 ==
+        if (len(self.attackerIdxs) + len(self.noCardsPlayerIdxs) + 1 ==
             self.roundParameters.numPlayers and
             defenderPlayer.name == attackingPlayer.name):
             self.txQueue.put_nowait(ClientTxMsg(["ATTACK-BAD", "Last defender can't attack"],
@@ -166,8 +171,11 @@ class Round(MsgSrc):
 
             self.tableCardsMsgSrc.updateAttack(attackingPlayer, attackCards)
 
+            # PENDING: fold the code so there is one place for attack okay etc
             # Send ATTACK-OKAY
             self.txQueue.put_nowait(ClientTxMsg(["ATTACK-OKAY"], {ws}, initiatorWs=ws))
+
+            self.roundState = RoundState.PAST_FIRST_ATTACK
 
             self.refresh()
             return True
@@ -198,7 +206,7 @@ class Round(MsgSrc):
         # Ensure next defender has enough cards to defend with
         nextDefenderIdx = self.firstPlayerIdxWithCards(self.defenderIdx + 1)
         assert nextDefenderIdx is not None
-        assert nextDefenderIdx not in self.finishedPlayerIdxs
+        assert nextDefenderIdx not in self.noCardsPlayerIdxs
         assert nextDefenderIdx not in self.attackerIdxs
 
         nextDefender = self.getPlayersByIdxs([nextDefenderIdx])[0]
@@ -217,6 +225,7 @@ class Round(MsgSrc):
 
         # Send ATTACK-OKAY
         self.txQueue.put_nowait(ClientTxMsg(["ATTACK-OKAY"], {ws}, initiatorWs=ws))
+        self.roundState = RoundState.PAST_FIRST_ATTACK
 
         self.refresh()
         return True
@@ -290,6 +299,46 @@ class Round(MsgSrc):
 
         # PENDING: Ensure if defender has no cards left, it's
         # the end of this turn
+
+        self.refresh()
+
+        return True
+
+    #--------------------------------------------
+    # Done handling
+
+    def playerDone(self, ws, player):
+        # Ensure round state
+        if self.roundState != RoundState.PAST_FIRST_ATTACK:
+            self.txQueue.put_nowait(ClientTxMsg(["DONE-BAD", "Attack must start first"],
+                                                {ws}, initiatorWs=ws))
+            return True
+
+
+        # Ensure only attackers can send DONE
+        if player not in self.attackerPlayers():
+            self.txQueue.put_nowait(ClientTxMsg(["DONE-BAD", "Only attackers can play done"],
+                                                {ws}, initiatorWs=ws))
+            return True
+
+        # Ensure DONE can't be sent twice
+        if player in self.donePlayers:
+            self.txQueue.put_nowait(ClientTxMsg(["DONE-BAD", "Already played done"],
+                                                {ws}, initiatorWs=ws))
+            return True
+
+        # Ensure there is at least one attack done
+        if not self.tableCardsMsgSrc.attackPilesByPlayerName:
+            self.txQueue.put_nowait(ClientTxMsg(
+                ["DONE-BAD", "Can't declare DONE without some attack"],
+                {ws}, initiatorWs=ws))
+            return True
+
+        self.donePlayers.add(player)
+
+        self.txQueue.put_nowait(ClientTxMsg(["DONE-OKAY"], {ws}, initiatorWs=ws))
+
+        self.refresh()
 
         return True
 

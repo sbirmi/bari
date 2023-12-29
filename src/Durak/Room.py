@@ -56,6 +56,9 @@ class Room(GamePlugin):
         if qmsg.jmsg[0] == "DEFEND":
             return self.__processDefend(qmsg)
 
+        if qmsg.jmsg[0] == "DONE":
+            return self.__processDone(qmsg)
+
         return True
 
     def postProcessConnect(self, ws):
@@ -299,3 +302,36 @@ class Room(GamePlugin):
             defendCards.append(attackDefendCards)
 
         return self.round.playerDefend(ws, player, defendCards)
+
+    #--------------------------------------------
+    # Donehandling
+
+    def __processDone(self, qmsg):
+        """
+        ["DONE"]
+        """
+        ws = qmsg.initiatorWs
+
+        if self.state != GameState.RUNNING:
+            self.txQueue.put_nowait(ClientTxMsg(["DONE-BAD",
+                                                 "Game not running"],
+                                                {ws}, initiatorWs=ws))
+            return True
+
+        assert ws in self.playerByWs, "Done request from an unrecognized connection"
+
+        player = self.playerByWs[ws]
+
+        if player is None:
+            # Spectators are added as None to playerByWs
+            self.txQueue.put_nowait(ClientTxMsg(["DONE-BAD",
+                                                 "Must join the game first"],
+                                                {ws}, initiatorWs=ws))
+            return True
+
+        if len(qmsg.jmsg) != 1:
+            self.txQueue.put_nowait(ClientTxMsg(["DONE-BAD", "Invalid message length"],
+                                                {ws}, initiatorWs=ws))
+            return True
+
+        return self.round.playerDone(ws, player)
