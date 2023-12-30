@@ -16,7 +16,8 @@ from Common.Card import (
 class RoundState(Enum):
     WAIT_FIRST_ATTACK = 1
     PAST_FIRST_ATTACK = 2
-    ROUND_OVER = 5
+    DEFENDER_GAVEUP = 3
+    ROUND_OVER = 4
 
 class Round(MsgSrc):
     """
@@ -33,7 +34,8 @@ class Round(MsgSrc):
                  playerByName,
                  playerTurnOrder,
                  roundNum=0,
-                 startTurnIdx=0):
+                 startTurnIdx=0,
+                 numCardsToStart=6):
         super(Round, self).__init__(conns)
 
         self.txQueue = txQueue
@@ -41,6 +43,7 @@ class Round(MsgSrc):
         self.playerByName = playerByName
         self.playerTurnOrder = playerTurnOrder
         self.startTurnIdx = startTurnIdx
+        self.numCardsToStart = numCardsToStart # Pending: pass via round parameters
 
         self.roundNum = roundNum
         self.roundState = RoundState.WAIT_FIRST_ATTACK
@@ -83,13 +86,14 @@ class Round(MsgSrc):
         # Sets up the table and deals out cards
         self.tableCardsMsgSrc = TableCardsMsgSrc(
                 self._conns, self.roundParameters,
-                {pn: player.hand for pn, player in self.playerByName.items()})
+                {pn: player.hand for pn, player in self.playerByName.items()},
+                numCardsToStart=self.numCardsToStart)
 
         self.startTurn()
 
     def startTurn(self):
         # Assert the round isn't over
-        assert self.roundState != RoundState.ROUND_OVER
+        # assert self.roundState  RoundState.ROUND_OVER # PENDING: should there be an assert here?
 
         self.roundState = RoundState.WAIT_FIRST_ATTACK
 
@@ -101,7 +105,59 @@ class Round(MsgSrc):
         assert self.defenderIdx is not None
         assert self.attackerIdxs[0] != self.defenderIdx
 
+        self.tableCardsMsgSrc.newTurn()
+
         self.refresh()
+
+    def maybeTurnOver(self):
+        """Returns True if turn/game is over. Otherwise False.
+
+        Game is over if
+        - self.roundState = DEFENDER_GAVEUP
+        - all attackes have declared done
+        - defender has 0 cards left
+        """
+        if not (self.roundState == RoundState.DEFENDER_GAVEUP or
+                len(self.attackerIdxs) == len(self.donePlayers) or
+                self.defenderPlayer().cardCount() == 0):
+            # Turn not over yet
+            return False
+
+        # When starting a rew round
+        # - deal out cards as necessary
+        # - figure out noCards players
+        # - figure out if game is over
+        # - advance turnIdx
+
+        # Deal cards
+        for player in self.attackerPlayers() + [self.defenderPlayer()]:
+            cardsDeficiet = self.numCardsToStart - player.cardCount()
+            cardsDeficiet = cardsDeficiet if cardsDeficiet > 0 else 0
+
+            drawIncomplete = self.tableCardsMsgSrc.playerDraw(player, cardsDeficiet)
+            if drawIncomplete:
+                # Draw deck is empty
+                break
+
+        # Check who has finished
+        for player in self.playerByName.values():
+            if player.cardCount() == 0:
+                self.donePlayers.add(player)
+
+        if self.maybeRoundOver():
+            return True
+
+        if self.roundState == RoundState.DEFENDER_GAVEUP:
+            self.startTurnIdx = self.firstPlayerIdxWithCards(self.defenderIdx + 1)
+        else:
+            self.startTurnIdx = self.defenderIdx
+
+        self.startTurn()
+        return True
+
+    def maybeRoundOver(self):
+        # PENDING
+        return False
 
     def refresh(self):
         data = {}
@@ -121,7 +177,7 @@ class Round(MsgSrc):
     # Attack handling
 
     def playerAttack(self, ws, attackingPlayer, attackCards):
-        if self.roundState == RoundState.ROUND_OVER:
+        if self.roundState in {RoundState.ROUND_OVER, RoundState.DEFENDER_GAVEUP}:
             self.txQueue.put_nowait(ClientTxMsg(["ATTACK-BAD", "Can't attack right now"],
                                                 {ws}, initiatorWs=ws))
             return True
@@ -227,7 +283,10 @@ class Round(MsgSrc):
         self.txQueue.put_nowait(ClientTxMsg(["ATTACK-OKAY"], {ws}, initiatorWs=ws))
         self.roundState = RoundState.PAST_FIRST_ATTACK
 
-        self.refresh()
+        if not self.maybeTurnOver():
+            # If turn isn't over, do an explicit refresh
+            self.refresh()
+
         return True
 
     #--------------------------------------------
@@ -238,7 +297,7 @@ class Round(MsgSrc):
         attackDefendCards = [ [attackCard1, defendCard1], ... ]
         """
         # Ensure round state
-        if self.roundState == RoundState.ROUND_OVER:
+        if self.roundState in {RoundState.ROUND_OVER, RoundState.DEFENDER_GAVEUP}:
             self.txQueue.put_nowait(ClientTxMsg(["DEFEND-BAD", "Can't defend right now"],
                                                 {ws}, initiatorWs=ws))
             return True
@@ -297,10 +356,9 @@ class Round(MsgSrc):
         # Send DEFEND-OKAY
         self.txQueue.put_nowait(ClientTxMsg(["DEFEND-OKAY"], {ws}, initiatorWs=ws))
 
-        # PENDING: Ensure if defender has no cards left, it's
-        # the end of this turn
-
-        self.refresh()
+        if not self.maybeTurnOver():
+            # If turn isn't over, do an explicit refresh
+            self.refresh()
 
         return True
 
@@ -313,7 +371,6 @@ class Round(MsgSrc):
             self.txQueue.put_nowait(ClientTxMsg(["DONE-BAD", "Attack must start first"],
                                                 {ws}, initiatorWs=ws))
             return True
-
 
         # Ensure only attackers can send DONE
         if player not in self.attackerPlayers():
@@ -338,7 +395,47 @@ class Round(MsgSrc):
 
         self.txQueue.put_nowait(ClientTxMsg(["DONE-OKAY"], {ws}, initiatorWs=ws))
 
-        self.refresh()
+        if not self.maybeTurnOver():
+            # If turn isn't over, do an explicit refresh
+            self.refresh()
+
+        return True
+
+    #--------------------------------------------
+    # GIVEUP handling
+
+    def playerGiveup(self, ws, player):
+        # Ensure round state
+        if self.roundState != RoundState.PAST_FIRST_ATTACK:
+            self.txQueue.put_nowait(ClientTxMsg(["GIVEUP-BAD", "Attack must start first"],
+                                                {ws}, initiatorWs=ws))
+            return True
+
+        # Ensure only defender can give up
+        defender = self.defenderPlayer()
+        if player != defender:
+            self.txQueue.put_nowait(ClientTxMsg(["GIVEUP-BAD", "Only defender can give up"],
+                                                {ws}, initiatorWs=ws))
+            return True
+
+        # Ensure all attacks aren't defended against
+        _, undefendedCards = self.tableCardsMsgSrc.attackDefendStatus()
+
+        if not undefendedCards:
+            self.txQueue.put_nowait(ClientTxMsg(
+                ["GIVEUP-BAD", "All attacks are defended against. You can't give up"],
+                {ws}, initiatorWs=ws))
+            return True
+
+        # Do the needful when someone gives up
+        self.tableCardsMsgSrc.updateGiveup(defender)
+
+        self.txQueue.put_nowait(ClientTxMsg(["GIVEUP-OKAY"], {ws}, initiatorWs=ws))
+
+        self.roundState = RoundState.DEFENDER_GAVEUP
+        assert self.maybeTurnOver() is True
+        # An explicit self.refresh() isn't needed because we'll start a new turn
+        # (or end the game) as needed.
 
         return True
 
@@ -380,6 +477,16 @@ class TableCardsMsgSrc(MsgSrc):
         for hand in handByPlayerName.values():
             playerCards = [self.cards.pop() for _ in range(numCardsToStart)]
             hand.setCards(playerCards)
+
+    def newTurn(self):
+        self.attackPilesByPlayerName = {}
+
+    def playerDraw(self, player, numCards):
+        actualDeal = min(numCards, len(self.cards))
+        cards = [self.cards.pop() for _ in range(actualDeal)]
+        player.hand.addCards(cards)
+        self.refresh()
+        return actualDeal < numCards
 
     def validAttackCards(self, cards):
         # PENDING: can return error reason as string instead
@@ -467,6 +574,21 @@ class TableCardsMsgSrc(MsgSrc):
         # Done defending against attacks
 
         self.refresh()
+
+    def updateGiveup(self, defender):
+        # Everything in self.attackPilesByPlayerName is given
+        # to the defender
+
+        boardCards = []
+        for attackPiles in self.attackPilesByPlayerName.values():
+            for pile in attackPiles:
+                boardCards.extend(pile)
+
+        defender.hand.addCards(boardCards)
+        self.attackPilesByPlayerName = {}
+
+        # Explicit self.refresh() isn't needed because we'll start a
+        # new turn
 
     def refresh(self):
         msg = ["TABLE-CARDS",

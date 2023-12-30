@@ -69,6 +69,10 @@ class PlayerHand:
 
         self.refresh()
 
+    def addCards(self, cards):
+        self.cards.extend(cards)
+        self.refresh()
+
     def refresh(self):
         msg = ["PLAYER-HAND",
                self.name,

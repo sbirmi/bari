@@ -59,6 +59,9 @@ class Room(GamePlugin):
         if qmsg.jmsg[0] == "DONE":
             return self.__processDone(qmsg)
 
+        if qmsg.jmsg[0] == "GIVEUP":
+            return self.__processGiveup(qmsg)
+
         return True
 
     def postProcessConnect(self, ws):
@@ -304,7 +307,7 @@ class Room(GamePlugin):
         return self.round.playerDefend(ws, player, defendCards)
 
     #--------------------------------------------
-    # Donehandling
+    # DONE handling
 
     def __processDone(self, qmsg):
         """
@@ -335,3 +338,36 @@ class Room(GamePlugin):
             return True
 
         return self.round.playerDone(ws, player)
+
+    #--------------------------------------------
+    # GIVEUP handling
+
+    def __processGiveup(self, qmsg):
+        """
+        ["GIVEUP"]
+        """
+        ws = qmsg.initiatorWs
+
+        if self.state != GameState.RUNNING:
+            self.txQueue.put_nowait(ClientTxMsg(["GIVEUP-BAD",
+                                                 "Game not running"],
+                                                {ws}, initiatorWs=ws))
+            return True
+
+        assert ws in self.playerByWs, "Give up request from an unrecognized connection"
+
+        player = self.playerByWs[ws]
+
+        if player is None:
+            # Spectators are added as None to playerByWs
+            self.txQueue.put_nowait(ClientTxMsg(["GIVEUP-BAD",
+                                                 "Must join the game first"],
+                                                {ws}, initiatorWs=ws))
+            return True
+
+        if len(qmsg.jmsg) != 1:
+            self.txQueue.put_nowait(ClientTxMsg(["GIVEUP-BAD", "Invalid message length"],
+                                                {ws}, initiatorWs=ws))
+            return True
+
+        return self.round.playerGiveup(ws, player)
