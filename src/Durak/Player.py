@@ -55,6 +55,10 @@ class PlayerHand:
         self.broadcastMsgSrc = MsgSrc(allConns)
         self.playerMsgSrc = MsgSrc(playerConns)
 
+    def resetCards(self):
+        self.cards = []
+        self.refresh()
+
     def setCards(self, cards):
         self.cards = cards
         self.refresh()

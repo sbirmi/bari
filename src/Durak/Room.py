@@ -12,6 +12,7 @@ from fwk.Msg import (
 
 from Common.Card import Card
 
+from Durak.GameOverMsgSrc import GameOverMsgSrc
 from Durak.HostParametersMsgSrc import HostParametersMsgSrc
 from Durak.Player import Player
 from Durak.Round import Round
@@ -37,7 +38,6 @@ class Room(GamePlugin):
         # Initialized after queues are set up
         self.hostParametersMsgSrc = None
         self.gameOverMsgSrc = None
-        self.scoreMsgSrc = None
 
     def initGame(self):
         """Called one time after queues are instantiated"""
@@ -47,22 +47,28 @@ class Room(GamePlugin):
         if super(Room, self).processMsg(qmsg):
             return True
 
+        result = False
         if qmsg.jmsg[0] == "JOIN":
-            return self.__processJoin(qmsg)
+            result |= self.__processJoin(qmsg)
 
         if qmsg.jmsg[0] == "ATTACK":
-            return self.__processAttack(qmsg)
+            result |= self.__processAttack(qmsg)
 
         if qmsg.jmsg[0] == "DEFEND":
-            return self.__processDefend(qmsg)
+            result |= self.__processDefend(qmsg)
 
         if qmsg.jmsg[0] == "DONE":
-            return self.__processDone(qmsg)
+            result |= self.__processDone(qmsg)
 
         if qmsg.jmsg[0] == "GIVEUP":
-            return self.__processGiveup(qmsg)
+            result |= self.__processGiveup(qmsg)
 
-        return True
+        if result and self.state != GameState.GAME_OVER:
+            if self.round and self.round.gameOver():
+                self.state = GameState.GAME_OVER
+                self.gameOverMsgSrc = GameOverMsgSrc(self.conns)
+
+        return result
 
     def postProcessConnect(self, ws):
         # Publish GAME-STATUS with number of clients connected to this room

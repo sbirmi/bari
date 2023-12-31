@@ -56,6 +56,9 @@ class Round(MsgSrc):
         self.tableCardsMsgSrc = None
         self.scoreCardMsgSrc = None
 
+    def gameOver(self):
+        return self.roundState == RoundState.GAME_OVER
+
     def getPlayersByIdxs(self, idxs):
         return [self.playerByName[self.playerTurnOrder[idx]]
                 for idx in idxs]
@@ -79,6 +82,17 @@ class Round(MsgSrc):
         return None
 
     def startRound(self):
+        # Create the score card exactly once
+        if self.scoreCardMsgSrc is None:
+            self.scoreCardMsgSrc = ScoreCardMsgSrc(self._conns, self.playerTurnOrder)
+
+        losers = self.scoreCardMsgSrc.playersReachedScore(self.roundParameters.stopPoints)
+        if losers:
+            # Game over
+            self.roundState = RoundState.GAME_OVER
+            self.tableCardsMsgSrc.setGameOver(self.playerByName.values())
+            return
+
         self.roundNum += 1
         self.roundState = RoundState.WAIT_FIRST_ATTACK
         self.attackerIdxs = []
@@ -91,10 +105,6 @@ class Round(MsgSrc):
                 self._conns, self.roundParameters,
                 {pn: player.hand for pn, player in self.playerByName.items()},
                 numCardsToStart=self.numCardsToStart)
-
-        # Create the score card exactly once
-        if self.scoreCardMsgSrc is None:
-            self.scoreCardMsgSrc = ScoreCardMsgSrc(self._conns, self.playerTurnOrder)
 
         self.startTurn()
 
@@ -615,6 +625,12 @@ class TableCardsMsgSrc(MsgSrc):
 
         # Explicit self.refresh() isn't needed because we'll start a
         # new turn
+
+    def setGameOver(self, players):
+        for player in players:
+            player.hand.resetCards()
+        self.trumpSuit = None
+        self.refresh()
 
     def refresh(self):
         msg = ["TABLE-CARDS",

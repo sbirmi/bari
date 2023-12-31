@@ -31,3 +31,7 @@ class ScoreCardMsgSrc(MsgSrc):
 
     def refresh(self):
         self.setMsgs([Jmai(["SCORE", self.scoreByPlayerByRound, self.totalScore], None)])
+
+    def playersReachedScore(self, targetScore):
+        return {player for player, score in self.totalScore.items()
+                if score >= targetScore}

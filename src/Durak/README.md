@@ -67,7 +67,8 @@ Server --> client
      score-per-round, # roundNum --> player --> score collected
      total-score, # playerName --> score
     ]
-    
+
+    ["GAME-OVER"]
 ```
 
 Client --> server
