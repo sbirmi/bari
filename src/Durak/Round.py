@@ -12,12 +12,14 @@ from Common.Card import (
         Card,
         cardListContains,
 )
+from Durak.ScoreCardMsgSrc import ScoreCardMsgSrc
 
 class RoundState(Enum):
     WAIT_FIRST_ATTACK = 1
     PAST_FIRST_ATTACK = 2
     DEFENDER_GAVEUP = 3
     ROUND_OVER = 4
+    GAME_OVER = 5
 
 class Round(MsgSrc):
     """
@@ -52,6 +54,7 @@ class Round(MsgSrc):
         self.defenderIdx = None         # Player who is defending in this turn
         self.noCardsPlayerIdxs = []     # Players with 0 cards left
         self.tableCardsMsgSrc = None
+        self.scoreCardMsgSrc = None
 
     def getPlayersByIdxs(self, idxs):
         return [self.playerByName[self.playerTurnOrder[idx]]
@@ -88,6 +91,10 @@ class Round(MsgSrc):
                 self._conns, self.roundParameters,
                 {pn: player.hand for pn, player in self.playerByName.items()},
                 numCardsToStart=self.numCardsToStart)
+
+        # Create the score card exactly once
+        if self.scoreCardMsgSrc is None:
+            self.scoreCardMsgSrc = ScoreCardMsgSrc(self._conns, self.playerTurnOrder)
 
         self.startTurn()
 
@@ -156,7 +163,26 @@ class Round(MsgSrc):
         return True
 
     def maybeRoundOver(self):
-        # PENDING
+        # If no player has cards remaining or only 1 player has
+        # cards remaining, this round is over
+
+        cardCountHistogram = defaultdict(set)
+
+        for playerName, player in self.playerByName.items():
+            cardCountHistogram[player.cardCount()].add(playerName)
+
+        if len(cardCountHistogram.get(0, {})) == self.roundParameters.numPlayers:
+            self.scoreCardMsgSrc.setRoundLosers(self.roundNum, [])
+            self.startRound()
+            return True
+
+        if len(cardCountHistogram.get(0, {})) == self.roundParameters.numPlayers - 1:
+            # One player is left with all remaining cards
+            self.scoreCardMsgSrc.setRoundLosers(self.roundNum,
+                                                set(self.playerTurnOrder) - cardCountHistogram[0])
+            self.startRound()
+            return True
+
         return False
 
     def refresh(self):

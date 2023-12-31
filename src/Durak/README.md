@@ -2,12 +2,13 @@
 
 ## Todo
 
-- GIVEUP from defender
-- playerAttack code reorg
-- attackers should be attackers - defenders
-- invoke isTurnOver at the end of any move
 - pass more parameters thru RoundParameters
+- Who starts the first round
 
+Nice to have
+
+- attackers should be attackers - defenders
+- playerAttack code reorg
 
 ---
 
@@ -61,6 +62,11 @@ Server --> client
     ["PLAYER-HAND", name, numCards, cards (optional)]
 
     ["PLAYER-STATUS", self.name, self.numConns()]
+
+    ["SCORE",
+     score-per-round, # roundNum --> player --> score collected
+     total-score, # playerName --> score
+    ]
     
 ```
 
