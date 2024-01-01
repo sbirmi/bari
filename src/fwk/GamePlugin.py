@@ -5,6 +5,9 @@ The Plugin is used as the base for:
 3. the GamePlugin (defined here), base for a Game
 """
 
+import sys
+import traceback
+
 from fwk.MsgSrc import (
         Connections,
         Jmai,
@@ -117,7 +120,12 @@ class Plugin:
             self.rxQueue.task_done()
             trace(Level.msg, self.path, "received", str(qmsg))
 
-            processed = self.processMsg(qmsg)
+            try:
+                processed = self.processMsg(qmsg)
+            except Exception as _: # pylint: disable=broad-exception-caught
+                traceback.print_exc()
+                sys.exit(0)
+
             if not processed:
                 if not isinstance(qmsg, ClientRxMsg):
                     trace(Level.error, "Unexpected message not handled:", str(qmsg))

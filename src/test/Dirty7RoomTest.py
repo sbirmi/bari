@@ -3,12 +3,11 @@ import random
 import unittest
 
 from test.MsgTestLib import MsgTestLib
+from Common import Card
 from Dirty7 import (
-        Card,
         Dirty7Game,
         Dirty7Room,
         Dirty7Round,
-        Exceptions,
 )
 from fwk.Common import Map
 from fwk.MsgSrc import Connections
@@ -16,7 +15,6 @@ from fwk.Msg import (
         ClientRxMsg,
         ClientTxMsg,
         InternalConnectWsToGi,
-        InternalHost,
         InternalGiStatus,
 )
 from fwk.Trace import trace, Level

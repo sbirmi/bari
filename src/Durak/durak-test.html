@@ -1,0 +1,258 @@
+<html>
+
+<script>
+<!--
+var conn = null;
+var url = "ws://hyp:7000/";
+var my_name = null;
+var playerTurnOrder = null;
+var playerCards = new Map();
+
+var table_cards = null;
+var player_attacks = new Map();
+var trump = null;
+var bottom_card = null;
+
+var attackers = [];
+var defender = null;
+var done_players = [];
+
+function receive(msg)   {
+   console.log(msg.data);
+   const data = JSON.parse(msg.data);
+
+   if (data[0] == "ROUND") {
+      defender = data[2]["defender"];
+      attackers = data[2]["attackers"];
+      playerTurnOrder = data[2]["playerTurnOrder"];
+      done_players = data[2]["done"];
+      refresh();
+   }
+
+   if (data[0] == "PLAYER-HAND") {
+      if (data.length == 4) {
+         var hand = [];
+         for (let suit_rank of data[3]) {
+            hand.push(cardFromJmsg(suit_rank));
+         }
+         playerCards.set(data[1], hand);
+      } else if (data[1] != my_name) {
+         playerCards.set(data[1], data[2]);
+      }
+      refresh();
+   }
+
+   if (data[0] == "TABLE-CARDS") {
+      table_cards = data;
+      refresh();
+   }
+}
+
+function refresh() {
+   if (playerTurnOrder == null) {
+      return;
+   }
+
+   var attacks;
+   if (table_cards) {
+      var html = "";
+
+      html += "Trump: " + SuitMap.get(table_cards[1]["trump"]);
+      if (table_cards[1]["bottomCard"]) {
+         html += ", bottom card: " + cardFromJmsg(table_cards[1]["bottomCard"]);
+      }
+      document.getElementById("board_ui").innerHTML = html;
+      attacks = table_cards[1]["attacks"];
+   }
+
+   var html = "";
+   for (let player_name of playerTurnOrder) {
+      var cards = playerCards.get(player_name);
+      if (cards) {
+         if (html) { html += "<br>"; }
+
+         var show_name = player_name; 
+         if (player_name == my_name) {
+            show_name = "<b>" + show_name + "</b>";
+         }
+         if (Number.isInteger(cards)) {
+            html += show_name + ": " + cards + " cards";
+         } else {
+            html += show_name + ": " + cards;
+         }
+
+         if (attackers && attackers.includes(player_name)) {
+            if (done_players.includes(player_name)) {
+               html += " (<s>attacker</s>)";
+            } else {
+               html += " (attacker)"
+            }
+
+            if (attacks && player_name in attacks) {
+               html += " &nbsp; &nbsp; Attacks:"
+               const card_piles = attacks[player_name];
+               for (let card_pile of card_piles) {
+                  if (card_pile.length == 1) {
+                     html += " <b>" + cardFromJmsg(card_pile[0]) + "</b>";
+                  } else {
+                     html += " <s>" + cardFromJmsg(card_pile[0]) + ":" + cardFromJmsg(card_pile[1]) + "</s>";
+                  }
+               }
+            }
+         }
+
+         if (player_name == defender) {
+            html += " (defender)";
+         }
+      }
+   }
+
+   document.getElementById("players_ui").innerHTML = html;
+}
+
+function parseCard(token) {
+   if (token.length < 2 || token.length > 3) {
+      alert("Invalid card length in " + token);
+      return null;
+   }
+
+   const suit = token[0];
+   if (!(["H", "C", "D", "S"].includes(suit))) {
+      alert("Invalid suit " + suit);
+      return null;
+   }
+
+   const rank = token.substr(1);
+   if (!(["1", "2", "3", "4", "5", "6", "7",
+          "8", "9", "10", "11", "12", "13"].includes(rank))) {
+      alert("Invalid rank " + rank);
+      return null;
+   }
+   return [token[0], parseInt(rank)];
+}
+
+const SuitMap = new Map([
+   ["S", "♠"],
+   ["C", "♣"],
+   ["H", "♥"],
+   ["D", "♦"]]);
+function cardFromJmsg(suitRank) {
+   return SuitMap.get(suitRank[0]) + suitRank[1];
+}
+
+function playAttack() {
+   // Input is like "C3 C10 H3"
+   const attack = document.getElementById("attack_ui").value;
+   const tokens = attack.split(" ");
+   var cards = [];
+   for (let token of tokens) {
+      const card = parseCard(token);
+      if (card == null) { return; }
+      cards.push(card);
+   }
+   send(["ATTACK", cards]);
+}
+
+function playDefend() {
+   // Input is like "C3:C7 C10:C12 H3:D1"
+   const defend_text = document.getElementById("defend_ui").value;
+   const regex = /([\w]+)\s*:\s*([\w]+)/g
+
+   var moves = [];
+   for (let match of defend_text.matchAll(regex)) {
+      var attack_card = parseCard(match[1]);
+      var defend_card = parseCard(match[2]);
+
+      if (!attack_card || !defend_card) {
+         return;
+      }
+
+      moves.push([attack_card, defend_card]);
+   }
+
+   send(["DEFEND", moves]);
+}
+
+function send(msg)      { conn.send(JSON.stringify(msg)); }
+
+function connect(path) {
+   conn = new WebSocket(url + path);
+   conn.onmessage = receive;
+   conn.onopen = function(e) {
+      send(["JOIN", my_name]);
+   }
+}
+
+function join() {
+   var path = document.getElementById("room").value;
+   my_name = document.getElementById("player_name").value;
+
+   if (my_name == "") {
+      alert("Specify player name");
+   } else {
+      connect(path);
+   }
+}
+
+-->
+</script>
+
+<body>
+
+<table>
+<tr>
+   <td>Room</td>
+   <td><input id=room value="durak:1"></td>
+</tr>
+
+<tr>
+   <td>Player name</td>
+   <td><input id=player_name value=""></td>
+</tr>
+</table>
+
+<input type=button value="Join" onClick="join();">
+
+<table>
+
+<tr>
+   <td>Board</td>
+   <td><label id=board_ui></label></td>
+</tr>
+
+<tr>
+   <td>Players</td>
+   <td><label id=players_ui></label></td>
+</tr>
+
+<tr>
+   <td>
+      Attack
+   </td>
+   <td>
+      <input id=attack_ui value=""> <input type=button value="Attack" onClick='playAttack();'>
+      <br>
+      <input type=button value="Done (attacker)" onClick='send(["DONE"]);'>
+   </td>
+</tr>
+
+<tr>
+   <td>
+      Defend
+   </td>
+   <td>
+      <input id=defend_ui value=""> <input type=button value="Defend" onClick='playDefend();'>
+      <br>
+      <input type=button value="Give up (defender)" onClick='send(["GIVEUP"]);'>
+   </td>
+</tr>
+
+<tr>
+   <td></td>
+</tr>
+
+</table>
+
+
+</body>
+</html>

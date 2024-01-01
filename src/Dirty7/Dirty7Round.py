@@ -15,7 +15,7 @@ from fwk.Trace import (
         Level,
         trace,
 )
-from Dirty7.Card import (
+from Common.Card import (
         CLUBS,
         DIAMONDS,
         HEARTS,

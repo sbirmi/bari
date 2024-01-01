@@ -1,7 +1,4 @@
-from collections import (
-    defaultdict,
-    namedtuple,
-)
+from collections import namedtuple
 import json
 import sqlite3
 
@@ -25,11 +22,11 @@ class Field():
             desc += " " + self.qualifier
         return desc
 
-    def encode(self, value): # pylint: disable=no-self-use
+    def encode(self, value):
         """Encode how it'll be stored in storage"""
         return value
 
-    def decode(self, value): # pylint: disable=no-self-use
+    def decode(self, value):
         """Decode when read from storage"""
         return value
 

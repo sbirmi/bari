@@ -32,11 +32,17 @@ class Card:
     def __hash__(self):
         return hash(str(self))
 
-
     def __str__(self):
         if self.suit == "JOKER":
             return "JOKER"
         return "{}{}".format(self.rank, self.suit)
+
+    @staticmethod
+    def deckCards(numDecks=0):
+        for _ in range(numDecks):
+            for suit in (CLUBS, DIAMONDS, HEARTS, SPADES):
+                for rank in range(1, 14):
+                    yield Card(suit, rank)
 
     @staticmethod
     def fromJmsg(jmsg):
@@ -86,3 +92,21 @@ class CardGroupBase:
             cards1_.pop(idx)
 
         return True
+
+def cardListContains(cardBiggerList, cardSmallerList):
+    """
+    Returns True if cardBiggerList contains every element in
+    cardSmallerList. The function ensures that duplicates are
+    treated correctly
+    """
+    biggerList = cardBiggerList[:]
+
+    for card in cardSmallerList:
+        try:
+            idx = biggerList.index(card)
+        except ValueError:
+            return False
+
+        biggerList.pop(idx)
+
+    return True

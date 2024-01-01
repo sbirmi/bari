@@ -43,7 +43,8 @@ class WordSet:
         self._usedWordsByRequestor = defaultdict( set )
 
     def loadData(self):
-        self.data = yaml.safe_load(open(self.path))
+        with open(self.path, "r", encoding="ascii") as file:
+            self.data = yaml.safe_load(file)
         self.allWords = set(self.data.get('words', {}))
         trace(Level.info, "Loaded", len(self.allWords), "words")
 

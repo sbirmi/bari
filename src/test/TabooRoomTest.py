@@ -51,6 +51,7 @@ def stubs(objAttrTempValList):
                 (obj2, attrName2, tempVal2),]):
         # do testing
     """
+    # pylint: disable=unnecessary-dunder-call
     _stubs = [stub(*args) for args in objAttrTempValList]
     for _stub in _stubs:
         _stub.__enter__()

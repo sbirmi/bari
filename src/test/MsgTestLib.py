@@ -2,7 +2,6 @@
 
 # pylint: disable=missing-class-docstring
 # pylint: disable=too-few-public-methods
-# pylint: disable=no-self-use
 
 class MsgTestLib:
     def assertGiTxQueueMsgs(self, txq, expectedMsgs, anyOrder=False):
