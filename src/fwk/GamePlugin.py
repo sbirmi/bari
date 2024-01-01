@@ -122,7 +122,7 @@ class Plugin:
 
             try:
                 processed = self.processMsg(qmsg)
-            except Exception as exc:
+            except Exception as _: # pylint: disable=broad-exception-caught
                 traceback.print_exc()
                 sys.exit(0)
 
