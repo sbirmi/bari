@@ -129,13 +129,14 @@ class Round(MsgSrc):
     def maybeTurnOver(self):
         """Returns True if turn/game is over. Otherwise False.
 
-        Game is over if
+        Turn is over if
         - self.roundState = DEFENDER_GAVEUP
-        - all attackes have declared done
+        - all attackes have declared done && defender has defended
         - defender has 0 cards left
         """
         if not (self.roundState == RoundState.DEFENDER_GAVEUP or
-                len(self.attackerIdxs) == len(self.donePlayers) or
+                (len(self.attackerIdxs) == len(self.donePlayers) and
+                 not self.tableCardsMsgSrc.attackDefendStatus()[1]) or
                 self.defenderPlayer().cardCount() == 0):
             # Turn not over yet
             return False
@@ -516,6 +517,7 @@ class TableCardsMsgSrc(MsgSrc):
 
     def newTurn(self):
         self.attackPilesByPlayerName = {}
+        self.refresh()
 
     def playerDraw(self, player, numCards):
         actualDeal = min(numCards, len(self.cards))
@@ -549,7 +551,9 @@ class TableCardsMsgSrc(MsgSrc):
 
     def attackDefendStatus(self):
         """
-        If an attack pile has a single card => it's not defended against
+        Returns 2-tuple =
+            (number of defended attacks,
+             pending undefended attacks)
         """
         defendedAttackCount = 0
         undefended = []
